@@ -9,17 +9,17 @@ This smart home system integrates various functionalities such as camera streami
 ### Webpages
 
 1. **Home**: Displays all connected ESP8266 devices, their current status, and peripherals.
-   ![Home Page](images/Index.jpg)
+   ![Home Page](Images/Index.jpg)
 2. **Camera**: Live stream from the Raspberry Pi camera with recording capabilities.
-   ![Camera Page](images/Camera1.jpg)
+   ![Camera Page](Images/Camera1.jpg)
 3. **ESP Stream**: Live stream from ESP32-CAM. (Recording not available)
-   ![ESP Stream Page](images/Camera2.jpg)
+   ![ESP Stream Page](Images/Camera2.jpg)
 4. **Temperature Bad**: Shows temperature data from connected sensors.
-   ![Temperature Page](images/Temperatur.jpg)
+   ![Temperature Page](Images/Temperatur.jpg)
 5. **Stepper Motor Control**: Password-protected control for a stepper motor connected to an ESP8266.
-   ![Stepper Motor Control Page](images/Stepper.jpg)
+   ![Stepper Motor Control Page](Images/Stepper.jpg)
 6. **Video Library**: View all recorded videos from the Pi camera.
-   ![Video Library Page](images/VideoLib.jpg)
+   ![Video Library Page](Images/VideoLib.jpg)
 
 ### Hardware
 
@@ -51,8 +51,8 @@ pip install Pillow
 ##### 2. ESP Modules Setup:
 	- Connect the LED and DHT11 Sensor to the ESP8266. Connect the stepper motor to the appropriate pins.
 	- Flash the ESP32-CAM with the required firmware.
-![ESP-Cam Setup](images/ESP32-Cam.jpg)
-![ESP-Cam Setup](images/ESP8266_Full.jpg)
+![ESP-Cam Setup](Images/ESP32-Cam.jpg)
+![ESP-Cam Setup](Images/ESP8266_Full.jpg)
 ##### 3. Network Configuration:
 	- Ensure all devices are connected to the same local network.
 
