@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Pi Camera Stream{% endblock %}
+
+{% block content %}
+<style>
+    .camera-container {
+        text-align: center;
+        margin: 20px;
+    }
+
+    #stream {
+        max-width: 100%;
+        height: auto;
+        border: 3px solid #ddd;
+        margin-bottom: 10px;
+    }
+
+    .button-container {
+        margin: 10px;
+    }
+
+    #recordButton {
+        padding: 10px 20px;
+        font-size: 16px;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    #recordButton:hover {
+        background-color: #0056b3;
+    }
+
+    #recordingStatus {
+        margin-top: 10px;
+        font-size: 18px;
+        padding: 5px;
+        border-radius: 5px;
+    }
+
+    .recording {
+        color: white;
+        background-color: #dc3545;
+    }
+
+    .not-recording {
+        color: white;
+        background-color: #28a745;
+    }
+</style>
+
+<div class="camera-container">
+    <h1>Pi Camera Stream</h1>
+    <img id="stream" src="/stream" alt="Camera Stream">
+    <div class="button-container">
+        <button id="recordButton" onclick="toggleRecording()">Start Recording</button>
+        <div id="recordingStatus" class="not-recording">Not Recording</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var isRecording = false;
+
+    function refreshImage() {
+        const streamImage = document.getElementById('stream');
+        streamImage.src = '/stream?' + new Date().getTime();
+    }
+
+    function updateRecordingStatus() {
+        fetch('/recording_status')
+            .then(response => response.json())
+            .then(data => {
+                isRecording = data.recording;
+                var statusDiv = document.getElementById('recordingStatus');
+                var button = document.getElementById('recordButton');
+                if (isRecording) {
+                    statusDiv.innerHTML = 'Recording...';
+                    statusDiv.className = 'recording';
+                    button.textContent = 'Stop Recording';
+                } else {
+                    statusDiv.innerHTML = 'Not Recording';
+                    statusDiv.className = 'not-recording';
+                    button.textContent = 'Start Recording';
+                }
+            });
+    }
+
+    function toggleRecording() {
+        if (isRecording) {
+            fetch('/stop_recording', { method: 'POST' });
+        } else {
+            fetch('/start_recording', { method: 'POST' });
+        }
+    }
+
+    setInterval(refreshImage, 100);
+    setInterval(updateRecordingStatus, 100);
+</script>
+{% endblock %}
+

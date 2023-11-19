@@ -1,0 +1,1 @@
+Man muss die partition richtig einstellen

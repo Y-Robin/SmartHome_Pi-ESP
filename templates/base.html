@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Default Title{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+</head>
+<body>
+    <div class="navbar">
+        <!-- Navigation links -->
+        <a href="/">Home</a>
+        <a href="/camera">Camera</a>
+        <a href="/streamEsp">ESP-Stream</a>
+        <a href="/temperature">Temperature Bad</a>
+	<a href="/stepper">Stepper Motor Control</a>
+	<a href="/videoLib">Videos</a>
+    </div>
+
+    <div class="content">
+        {% block content %}
+        <!-- Content will be overridden in child templates -->
+        {% endblock %}
+    </div>
+
+    <div class="footer">
+        <p>Footer content goes here</p>
+    </div>
+
+    {% block scripts %}
+    <!-- Additional scripts can be added in child templates -->
+    {% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Home Page{% endblock %}
+
+{% block content %}
+<style>
+    .camera-container {
+        text-align: center;
+        margin: 20px;
+    }
+
+    #streamEsp {
+        max-width: 100%;
+        height: auto;
+        border: 3px solid #ddd;
+        margin-bottom: 10px;
+    }
+</style>
+<div class="camera-container">
+<h1>ESP Stream</h1>
+<img id="streamEsp" src="/streamEsp" alt="Camera Stream Esp">
+</div>
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+    function refreshImage() {
+        const streamImage = document.getElementById('streamEsp');
+        streamImage.src = '/streamEspImg?' + new Date().getTime();
+    }
+
+    setInterval(refreshImage, 100);  // Refresh every 100 milliseconds
+</script>
+
+{% endblock %}
+
+{% block styles %}
+
+{% endblock %}

@@ -49,7 +49,7 @@ pip install Pillow
 	- Attach the Raspberry Pi Camera Module.
 	- Follow the instructions for software setup and dependencies.
 ##### 2. ESP Modules Setup:
-	- Connect the LED and DHT11 Sensor to the ESP8266. Connect the stepper motor to the appropriate pins.
+	- Connect the LED and DHT11 Sensor to the ESP8266. Connect the stepper motor to the appropriate pins (LED: D1; Temperature: D2; Stepper: D5-D8 (5V supply)).
 	- Flash the ESP32-CAM with the required firmware.
 ![ESP-Cam Setup](Images/ESP32-Cam.jpg)
 ![ESP-Cam Setup](Images/ESP8266_Full.jpg)

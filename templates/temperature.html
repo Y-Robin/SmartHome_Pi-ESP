@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Home Page{% endblock %}
+
+{% block content %}
+
+    <div id="device-selector-container">
+        <label for="deviceSelect">Select Device:</label>
+        <select id="deviceSelect" onchange="updateChartForSelectedDevice()">
+            <option value="ESP_01">ESP_01</option>
+            <option value="ESP_02">ESP_02</option>
+            <option value="ESP_03">ESP_03</option>
+        </select>
+    </div>
+
+    <div id="date-picker-container">
+        <input type="date" id="selectedDate">
+        <button onclick="loadDataForSelectedDate()">Load Data</button>
+    </div>
+
+    <div id="temperature-data-container">
+        <h2>Live Temperature and Humidity Data</h2>
+        <canvas id="temperatureChart" style="width:100%; max-height:400px;"></canvas>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let globalData = [];  // Global variable to store all temperature data
+
+
+        const ctx = document.getElementById('temperatureChart').getContext('2d');
+
+        let chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: []
+                }, {
+                    label: 'Humidity (%)',
+                    backgroundColor: 'rgb(54, 162, 235)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    data: []
+                }]
+            },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'hour',
+                        tooltipFormat: 'MMM D, YYYY, h:mm a'
+                    }
+                }
+            },
+            plugins: {
+                    zoom: {
+
+                        pan: {
+                            enabled: true,
+                            mode: 'xy',
+                            threshold: 10
+                        },
+                        zoom: {
+                            wheel: {
+                                enabled: true
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'xy'
+                        }
+                    }
+                }
+        }
+        });
+
+        function updateChartWithData(filteredData) {
+            const temperatureData = filteredData.map(record => record.temperature);
+            const humidityData = filteredData.map(record => record.humidity);
+            const labels = filteredData.map(record => moment(record.timestamp).format('YYYY-MM-DD HH:mm:ss'));
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = temperatureData;
+            chart.data.datasets[1].data = humidityData;
+            chart.update();
+        }
+
+        function updateChartForDate(selectedDate) {
+            let filteredData;
+            if (selectedDate) {
+                const startDate = moment(selectedDate).startOf('day');
+                const endDate = moment(selectedDate).endOf('day');
+                filteredData = globalData.filter(record => moment(record.timestamp).isBetween(startDate, endDate));
+            } else {
+                let now = moment();
+		//console.log("Current time (now): ", now.format());
+
+		filteredData = globalData.filter(record => {
+		    let recordTime = moment(record.timestamp);
+		    //console.log("Record time: ", recordTime.format(), " | Is after 24 hours ago? ", recordTime.isAfter(now.clone().subtract(24, 'hours')));
+		    return recordTime.isAfter(now.clone().subtract(24, 'hours'));
+		});
+            }
+	    //console.log(filteredData); // Debugging line
+            updateChartWithData(filteredData);
+        }
+	
+
+	function updateChartForSelectedDevice() {
+            const selectedDevice = document.getElementById('deviceSelect').value;
+            fetch('/get_temperature_data?device_id=' + selectedDevice)
+                .then(response => response.json())
+                .then(data => {
+                    globalData = data; // Store fetched data in global variable
+                    updateChartForDate(); // Update chart with the new data
+                });
+        }
+
+        function loadDataForSelectedDate() {
+            const selectedDateValue = document.getElementById('selectedDate').value;
+            if (selectedDateValue) {
+                updateChartForDate(selectedDateValue);
+            } else {
+                // Handle case where no date is selected, maybe reload last 24 hours data
+                updateChartForDate();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+		updateChartForSelectedDevice(); // Load data for the default selected device on page load
+        });
+
+        // Initialize chart with empty data
+        
+
+    </script>
+{% endblock %}
+
+
