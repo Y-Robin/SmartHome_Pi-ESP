@@ -9,17 +9,17 @@ This smart home system integrates various functionalities such as camera streami
 ### Webpages
 
 1. **Home**: Displays all connected ESP8266 devices, their current status, and peripherals.
-   ![Home Page](Images/Index.jpg)
+   ![Home Page](Images/Index.png)
 2. **Camera**: Live stream from the Raspberry Pi camera with recording capabilities.
-   ![Camera Page](Images/Camera1.jpg)
+   ![Camera Page](Images/Camera1.png)
 3. **ESP Stream**: Live stream from ESP32-CAM. (Recording not available)
-   ![ESP Stream Page](Images/Camera2.jpg)
+   ![ESP Stream Page](Images/Camera2.png)
 4. **Temperature Bad**: Shows temperature data from connected sensors.
-   ![Temperature Page](Images/Temperatur.jpg)
+   ![Temperature Page](Images/Temperatur.png)
 5. **Stepper Motor Control**: Password-protected control for a stepper motor connected to an ESP8266.
-   ![Stepper Motor Control Page](Images/Stepper.jpg)
+   ![Stepper Motor Control Page](Images/Stepper.png)
 6. **Video Library**: View all recorded videos from the Pi camera.
-   ![Video Library Page](Images/VideoLib.jpg)
+   ![Video Library Page](Images/VideoLib.png)
 
 ### Hardware
 
