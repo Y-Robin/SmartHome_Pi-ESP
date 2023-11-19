@@ -50,11 +50,12 @@ pip install Pillow
 	- Follow the instructions for software setup and dependencies.
 ##### 2. ESP Modules Setup:
 	- Connect the LED and DHT11 Sensor to the ESP8266. Connect the stepper motor to the appropriate pins (LED: D1; Temperature: D2; Stepper: D5-D8 (5V supply)).
-	- Flash the ESP32-CAM with the required firmware.
+	- Flash the ESP32-CAM and ESP8266 with the required firmware from this repository.
 ![ESP-Cam Setup](Images/ESP32-Cam.jpg)
 ![ESP-Cam Setup](Images/ESP8266_Full.jpg)
 ##### 3. Network Configuration:
 	- Ensure all devices are connected to the same local network.
+ 	- Ensure all IP addresses are adapted to your local network (Python, HTML, Arduino)
 
 ##### Running the System
 To start the system, navigate to the git folder and execute the following commands in three separate terminals:
