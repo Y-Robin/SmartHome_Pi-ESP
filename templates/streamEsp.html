@@ -15,19 +15,40 @@
         border: 3px solid #ddd;
         margin-bottom: 10px;
     }
+
+    .slider-container {
+        text-align: center;
+        margin-top: 20px;
+    }
 </style>
+
 <div class="camera-container">
-<h1>ESP Stream</h1>
-<img id="streamEsp" src="/streamEspImg" alt="Camera Stream Esp">
+    <h1>ESP Stream</h1>
+    <img id="streamEsp" src="/streamEspImg" alt="Camera Stream Esp">
+</div>
+
+<div class="slider-container">
+    <label for="ledSlider">LED Helligkeit:</label>
+    <input type="range" id="ledSlider" name="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
+    <span id="ledValue">0</span>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script>
+    const esp32_ip = "{{ esp32_ip }}";  // Dynamisch vom Server eingesetzt
 
-
-
-{% endblock %}
-
-{% block styles %}
-
+    function updateLed(val) {
+        document.getElementById("ledValue").textContent = val;
+        fetch(`http://${esp32_ip}/control?var=led_intensity&val=${val}`)
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Fehler beim Senden des Befehls an ESP32');
+                }
+            })
+            .catch(error => {
+                console.error('Verbindungsfehler:', error);
+            });
+    }
+</script>
 {% endblock %}

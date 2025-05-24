@@ -20,6 +20,7 @@ if not camera_devices:
 # Erste Kamera-IP extrahieren (oder erweitern auf mehrere bei Bedarf)
 cam_info = next(iter(camera_devices.values()))
 stream_url = f"http://{cam_info['ip']}:81/stream"
+esp32_ip = cam_info['ip']
 latest_frame = None
 lock = threading.Lock()
 
@@ -51,7 +52,7 @@ capture_thread.start()
 
 @streaming_blueprint.route('/streamEsp')
 def streamEsp():
-    return render_template('streamEsp.html')
+    return render_template('streamEsp.html', esp32_ip=esp32_ip)
 
 @streaming_blueprint.route('/streamEspImg')
 def stream():
