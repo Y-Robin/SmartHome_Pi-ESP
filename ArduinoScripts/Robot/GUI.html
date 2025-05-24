@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Snapshot & Arduino Steuerung</title>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    /* Container für das "Joystick"-Element */
+    #joystick-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background-color: #ccc;
+      border-radius: 50%;
+      margin: 20px 0;
+      touch-action: none; /* wichtig für Pointer Events auf Touch-Geräten */
+    }
+    /* Kleiner Kreis in der Mitte, der bei Touch oder Mausbewegung verschoben wird */
+    #joystick-handle {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-color: #999;
+      border-radius: 50%;
+      top: 75px;  /* Zentriert in 200x200 */
+      left: 75px; /* Zentriert in 200x200 */
+      pointer-events: none; /* Keine direkten Events auf dem Handle selbst */
+    }
+  </style>
+</head>
+<body>
+  <h1>ESP32 Snapshot & Arduino Steuerung</h1>
+
+  <!-- Schnappschuss-Bild vom ESP32 (wird automatisch alle 1 Sek. aktualisiert) -->
+  <img id="snapshot" src="http://192.168.178.31/snapshot" width="640" alt="Schnappschuss vom ESP32">
+
+  <p>Bewege den Joystick, um Befehle an das Arduino-Fahrzeug zu senden.</p>
+
+  <!-- Joystick -->
+  <div id="joystick-container">
+    <div id="joystick-handle"></div>
+  </div>
+
+  <script>
+    // IP des ESP32 anpassen!
+    const ESP32_IP = "192.168.178.31";
+
+    // -- 1) Schnappschuss aktualisieren (z.B. alle 1 Sek.) --
+    setInterval(() => {
+      const snapshotEl = document.getElementById("snapshot");
+      snapshotEl.src = `http://${ESP32_IP}/snapshot?time=${Date.now()}`;
+    }, 200);
+
+    // -- 2) Funktion zum Senden von Befehlen an den ESP32 --
+    function sendCommand(cmd) {
+      fetch(`http://${ESP32_IP}/command?cmd=${cmd}`)
+        .then(response => response.text())
+        .then(data => {
+          console.log("Antwort vom ESP32:", data);
+        })
+        .catch(err => console.error("Fehler beim Senden des Befehls:", err));
+    }
+
+    // -- 3) Joystick-Logik --
+    const joystickContainer = document.getElementById("joystick-container");
+    const joystickHandle    = document.getElementById("joystick-handle");
+
+    const containerSize = 200; // Durchmesser des Joystick-Bereichs
+    const handleSize    = 50;  // Durchmesser des Joystick-Griffs
+    const center        = containerSize / 2; // Mittelpunkt
+
+    let pointerActive   = false;
+    let currentCommand  = "stop_it"; // Merkt sich den letzten Befehl
+
+    joystickContainer.addEventListener("pointerdown", e => {
+      pointerActive = true;
+      joystickContainer.setPointerCapture(e.pointerId);
+      updateJoystick(e);
+    });
+
+    joystickContainer.addEventListener("pointermove", e => {
+      if (!pointerActive) return;
+      updateJoystick(e);
+    });
+
+    joystickContainer.addEventListener("pointerup", e => {
+      pointerActive = false;
+      joystickContainer.releasePointerCapture(e.pointerId);
+
+      // Griff zurück in die Mitte
+      joystickHandle.style.left = `${center - handleSize/2}px`;
+      joystickHandle.style.top  = `${center - handleSize/2}px`;
+
+      // stop_it senden (falls nicht schon "stop_it")
+      if (currentCommand !== "stop_it") {
+        currentCommand = "stop_it";
+        sendCommand("stop_it");
+      }
+    });
+
+    function updateJoystick(e) {
+      // Position innerhalb des Containers berechnen
+      const rect = joystickContainer.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+
+      // Abstand vom Mittelpunkt
+      const dx = offsetX - center;
+      const dy = offsetY - center;
+
+      // Maximalradius, den der Griff laufen darf (Kreisrand minus halber Durchmesser des Griffs)
+      const maxRadius = (containerSize - handleSize) / 2;
+
+      const distance = Math.sqrt(dx*dx + dy*dy);
+
+      let clampedX = dx;
+      let clampedY = dy;
+
+      // Falls wir über den Rand hinaus sind, clampen wir auf den Rand
+      if (distance > maxRadius) {
+        const angle = Math.atan2(dy, dx);
+        clampedX = Math.cos(angle) * maxRadius;
+        clampedY = Math.sin(angle) * maxRadius;
+      }
+
+      // Griff positionieren
+      joystickHandle.style.left = `${center + clampedX - handleSize/2}px`;
+      joystickHandle.style.top  = `${center + clampedY - handleSize/2}px`;
+
+      // Richtung anhand x/y bestimmen
+      const dir = getDirectionFromOffset(clampedX, clampedY);
+      if (dir !== currentCommand) {
+        currentCommand = dir;
+        sendCommand(dir);
+      }
+    }
+
+    // Bestimmt anhand von x, y die Richtung
+    function getDirectionFromOffset(x, y) {
+      // Kleiner "Toleranzbereich", um direktes Hin- und Herspringen zu vermeiden
+      const threshold = 20; 
+
+      const absX = Math.abs(x);
+      const absY = Math.abs(y);
+
+      // Nah am Zentrum => stop
+      if (absX < threshold && absY < threshold) {
+        return "stop_it";
+      }
+
+      // Vor/Zurück
+      if (absX < threshold && y < -threshold) return "Forward";
+      if (absX < threshold && y > threshold)  return "Backward";
+
+      // Links/Rechts
+      if (absY < threshold && x < -threshold) return "Left";
+      if (absY < threshold && x > threshold)  return "Right";
+
+      // Diagonalen
+      if (x < -threshold && y < -threshold) return "LeftForward";
+      if (x < -threshold && y > threshold)  return "LeftBackward";
+      if (x > threshold && y < -threshold)  return "RightForward";
+      if (x > threshold && y > threshold)   return "RightBackward";
+
+      // Fallback
+      return "stop_it";
+    }
+  </script>
+</body>
+</html>
