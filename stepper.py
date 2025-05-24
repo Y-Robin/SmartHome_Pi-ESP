@@ -1,8 +1,27 @@
 from flask import Blueprint, request, render_template
 import requests
 from flask_httpauth import HTTPBasicAuth
+import yaml
+from pathlib import Path
+
+def load_config():
+    with open(Path("config.yaml"), 'r') as file:
+        return yaml.safe_load(file)
 
 def create_stepper_blueprint():
+
+    config = load_config()
+    # Finde die IP von dem ESP, der das Stepper-Modul hat
+    stepper_device_ip = None
+    for device in config["devices"].values():
+        if "Stepper" in device["elements"]:
+            stepper_device_ip = f"http://{device['ip']}"
+            break
+
+    if not stepper_device_ip:
+        raise ValueError("Kein Gerät mit Stepper-Element in der config.yaml gefunden.")
+
+
     auth = HTTPBasicAuth()
     users = {
         "root": "root",  # Replace with your desired username and password
@@ -15,7 +34,7 @@ def create_stepper_blueprint():
         return False
 
     stepper_blueprint = Blueprint('stepper', __name__, template_folder='templates')
-    ESP8266_IP = "http://192.168.178.45"  # Replace with the IP of your ESP8266
+    ESP8266_IP = stepper_device_ip  # Replace with the IP of your ESP8266
 
     @stepper_blueprint.route('/stepper')
     @auth.login_required  # This decorator should be applied directly to the route function
@@ -37,4 +56,3 @@ def create_stepper_blueprint():
         return response.text
 
     return stepper_blueprint
-

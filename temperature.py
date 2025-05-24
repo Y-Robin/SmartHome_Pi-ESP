@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import and_
 
 def create_temperature_blueprint(socketio, db):
     temperature_blueprint = Blueprint('temperature', __name__)
@@ -37,24 +38,34 @@ def create_temperature_blueprint(socketio, db):
 
     @temperature_blueprint.route('/get_temperature_data')
     def get_temperature_data():
-        device_id = request.args.get('device_id', 'ESP_01')  # Default to 'ESP_01' if no device_id is provided
-    
-        if device_id:
-            # Query data for a specific device
-            data = TemperatureData.query.filter_by(device_id=device_id).all()
+        device_id = request.args.get('device_id', 'ESP_01')
+        date_str = request.args.get('date', None)
+
+        query = TemperatureData.query.filter_by(device_id=device_id)
+
+        if date_str:
+            try:
+                selected_date = datetime.strptime(date_str, '%Y-%m-%d')
+                start = datetime.combine(selected_date, datetime.min.time())
+                end = datetime.combine(selected_date, datetime.max.time())
+                query = query.filter(TemperatureData.timestamp.between(start, end))
+            except ValueError:
+                return jsonify({"error": "Invalid date format"}), 400
         else:
-            # Query all data (or you can modify this to your requirement)
-            data = TemperatureData.query.all()
-    
+            # Default: Letzte 24 Stunden
+            end = datetime.utcnow()
+            start = end - timedelta(hours=24)
+            query = query.filter(TemperatureData.timestamp.between(start, end))
+
+        data = query.order_by(TemperatureData.timestamp.asc()).all()
+
         return jsonify([
             {
                 'device_id': record.device_id,
-                'temperature': record.temperature, 
-                'humidity': record.humidity, 
+                'temperature': record.temperature,
+                'humidity': record.humidity,
                 'timestamp': record.timestamp.isoformat()
-            } 
+            }
             for record in data
         ])
-
     return temperature_blueprint
-

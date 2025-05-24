@@ -2,16 +2,21 @@ from flask import Blueprint, request, jsonify, render_template
 import requests
 from requests.exceptions import ConnectionError
 from flask_socketio import SocketIO
+import yaml
+from pathlib import Path
 
 def create_led_blueprint(socketio):
     led_blueprint = Blueprint('led', __name__)
 
-    # Define multiple ESP devices
-    esp_devices = {
-        "ESP_01": {"ip": "192.168.178.45", "status": "unknown", 'elements': ['Led', 'Temperature', 'Stepper']},
-        "ESP_02": {"ip": "192.168.178.46", "status": "unknown", 'elements': ['Temperature', 'Led']},
-        "ESP_03": {"ip": "192.168.178.47", "status": "unknown", 'elements': []},
-    }
+    CONFIG_PATH = Path("config.yaml")
+
+    with open(CONFIG_PATH, 'r') as file:
+        config = yaml.safe_load(file)
+
+        esp_devices = {
+            device_id: {**info, "status": "unknown"}
+            for device_id, info in config['devices'].items()
+        }
 
 
     @led_blueprint.route('/')
@@ -52,4 +57,3 @@ def create_led_blueprint(socketio):
             esp_devices[device_id]['status'] = 'not connected'
 
     return led_blueprint
-

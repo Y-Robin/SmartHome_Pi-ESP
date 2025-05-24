@@ -3,3 +3,5 @@ __pycache__/
 *.mat
 config.yaml
 *config.h
+*.mp4
+*.db
