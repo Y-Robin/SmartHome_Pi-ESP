@@ -3,10 +3,8 @@
 #include <ESP8266HTTPClient.h>
 #include <DHT.h>
 #include <AccelStepper.h>
+#include "config.h"
 
-// Replace with your network credentials
-const char* ssid = "'***'";
-const char* password = "***";
 
 // Stepper motor pins and settings
 const int motorPin1 = D5; // Define motor control pins
@@ -21,7 +19,6 @@ const int ledPin = D1;
 #define DHTPIN D2  // Change to the pin you connected DHT
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
-const char* serverUrl = "http://192.168.178.25:80/record_temperature";
 
 ESP8266WebServer server(80);  // Create a web server on port 80
 
@@ -61,17 +58,19 @@ void setup() {
 void loop() {
   server.handleClient(); // Handle client requests
   handleStepperMovement();
-  float humidity = dht.readHumidity();
-  float temperature = dht.readTemperature();
 
-  if (isnan(humidity) || isnan(temperature)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return;
-  }
   //Serial.println(humidity);
   // Send temperature data to Flask server every 10 seconds
   static unsigned long lastTime = 0;
-  if (millis() - lastTime > 10000) {
+  if (millis() - lastTime > 100000) {
+    float humidity = dht.readHumidity();
+    float temperature = dht.readTemperature();
+
+    if (isnan(humidity) || isnan(temperature)) {
+      Serial.println("Failed to read from DHT sensor!");
+      delay(100);
+      return;
+    }
     lastTime = millis();
     if (WiFi.status() == WL_CONNECTED) {
       WiFiClient client;
