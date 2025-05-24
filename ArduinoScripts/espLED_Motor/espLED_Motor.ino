@@ -5,37 +5,44 @@
 #include <AccelStepper.h>
 #include "config.h"
 
-
-// Stepper motor pins and settings
-const int motorPin1 = D5; // Define motor control pins
+// Pins & Setup
+const int motorPin1 = D5;
 const int motorPin2 = D6;
 const int motorPin3 = D7;
 const int motorPin4 = D8;
 AccelStepper stepper(AccelStepper::FULL4WIRE, motorPin1, motorPin3, motorPin2, motorPin4);
 
-
-// Set the GPIO pin where you have connected your LED or relay
 const int ledPin = D1;
-#define DHTPIN D2  // Change to the pin you connected DHT
+#define DHTPIN D2
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
-ESP8266WebServer server(80);  // Create a web server on port 80
+ESP8266WebServer server(80);
 
-// Variables for stepper control
+// Stepper Control
 int currentAngle = 0;
 int targetAngle = 0;
 
+// Sensor- & Zeitsteuerung
+float temperature = NAN;
+float humidity = NAN;
+
+unsigned long lastReadTime = 0;
+unsigned long lastRetryTime = 0;
+const unsigned long readInterval = 100000;    // 100 s normal
+const unsigned long retryInterval = 5000;     // 5 s bei Fehler
+bool sensorReady = false;
+
 void setup() {
   Serial.begin(115200);
+  Serial.println("\nBooting...");
 
-  stepper.setMaxSpeed(100); // Set the maximum speed
-  stepper.setAcceleration(100); // Set the acceleration
-  
-  // Initialize the LED pin as an output
   pinMode(ledPin, OUTPUT);
-  dht.begin(); 
-  // Connect to WiFi
+  stepper.setMaxSpeed(100);
+  stepper.setAcceleration(100);
+
+  dht.begin();
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -45,65 +52,89 @@ void setup() {
   Serial.print("Connected to WiFi. IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Define web server routes
-  server.on("/", handleRoot);      // Call the 'handleRoot' function when a client requests URI "/"
-  server.on("/on", handleLedOn);   // Call 'handleLedOn' when a client requests URI "/on"
-  server.on("/off", handleLedOff); // Call 'handleLedOff' when a client requests URI "/off"
+  // Webserver-Routen
+  server.on("/", handleRoot);
+  server.on("/on", handleLedOn);
+  server.on("/off", handleLedOff);
   server.on("/set_angle", HTTP_GET, setAngle);
   server.on("/get_angle", HTTP_GET, getAngle);
-
-  server.begin(); // Start the server
+  server.begin();
 }
 
 void loop() {
-  server.handleClient(); // Handle client requests
+  server.handleClient();
   handleStepperMovement();
 
-  //Serial.println(humidity);
-  // Send temperature data to Flask server every 10 seconds
-  static unsigned long lastTime = 0;
-  if (millis() - lastTime > 100000) {
-    float humidity = dht.readHumidity();
-    float temperature = dht.readTemperature();
+  unsigned long now = millis();
 
-    if (isnan(humidity) || isnan(temperature)) {
-      Serial.println("Failed to read from DHT sensor!");
-      delay(100);
-      return;
-    }
-    lastTime = millis();
-    if (WiFi.status() == WL_CONNECTED) {
-      WiFiClient client;
-      HTTPClient http;
-      http.begin(client, serverUrl);
-      
-      http.addHeader("Content-Type", "application/json");
-      String payload = "{\"device_id\": \"ESP_01\", \"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + "}";
-      http.POST(payload);
-      http.end();
-      Serial.println(payload);
-    }
+  // Wenn Sensor nicht bereit → Retry alle 5s
+  if (!sensorReady && now - lastRetryTime >= retryInterval) {
+    lastRetryTime = now;
+    tryReadSensor();
+  }
+
+  // Normaler Lesezyklus alle 100s
+  if (sensorReady && now - lastReadTime >= readInterval) {
+    lastReadTime = now;
+    tryReadSensor();
   }
 }
 
+// Sensor lesen
+void tryReadSensor() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (!isnan(h) && !isnan(t)) {
+    humidity = h;
+    temperature = t;
+    sensorReady = true;
+    Serial.printf("DHT OK: %.1f°C, %.1f%%\n", temperature, humidity);
+    sendData();
+  } else {
+    sensorReady = false;
+    Serial.println("DHT read failed.");
+  }
+  yield();  // wichtig für Watchdog
+}
+
+// HTTP POST senden
+void sendData() {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClient client;
+    HTTPClient http;
+    http.begin(client, serverUrl);
+    http.setTimeout(2000);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"device_id\": \"ESP_01\", \"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + "}";
+    int code = http.POST(payload);
+    http.end();
+
+    Serial.printf("HTTP POST [%d] → %s\n", code, payload.c_str());
+  } else {
+    Serial.println("WiFi not connected. Skipping POST.");
+  }
+}
+
+// Webserver-Funktionen
 void handleRoot() {
   server.send(200, "text/plain", "ESP8266 LED Control");
 }
 
 void handleLedOn() {
-  digitalWrite(ledPin, HIGH);  // Turn the LED on
+  digitalWrite(ledPin, HIGH);
   server.send(200, "text/plain", "LED is ON");
 }
 
 void handleLedOff() {
-  digitalWrite(ledPin, LOW);   // Turn the LED off
+  digitalWrite(ledPin, LOW);
   server.send(200, "text/plain", "LED is OFF");
 }
 
 void setAngle() {
-  Serial.println(server.arg("angle"));
   if (server.arg("angle") != "") {
-    targetAngle = server.arg("angle").toInt()*2000/360;
+    targetAngle = server.arg("angle").toInt() * 2000 / 360;
     server.send(200, "text/plain", "Angle set to: " + String(targetAngle));
   } else {
     server.send(400, "text/plain", "Missing angle parameter");
@@ -114,6 +145,7 @@ void getAngle() {
   server.send(200, "text/plain", String(currentAngle));
 }
 
+// Stepper Motor Steuerung
 void handleStepperMovement() {
   if (stepper.distanceToGo() == 0) {
     stepper.moveTo(targetAngle);
