@@ -6,13 +6,7 @@
 
 #include <DHT.h>
 
-
-
-// Replace with your network credentials
-
-const char* ssid = "***";
-
-const char* password = "***";
+#include "config.h"
 
 // Set the GPIO pin where you have connected your LED or relay
 
@@ -26,7 +20,6 @@ const int ledPin = D1;
 
 DHT dht(DHTPIN, DHTTYPE);
 
-const char* serverUrl = "http://192.168.178.25:80/record_temperature";
 
 
 
