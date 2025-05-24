@@ -18,20 +18,13 @@
 </style>
 <div class="camera-container">
 <h1>ESP Stream</h1>
-<img id="streamEsp" src="/streamEsp" alt="Camera Stream Esp">
+<img id="streamEsp" src="/streamEspImg" alt="Camera Stream Esp">
 </div>
 {% endblock %}
 
 {% block scripts %}
 
-<script>
-    function refreshImage() {
-        const streamImage = document.getElementById('streamEsp');
-        streamImage.src = '/streamEspImg?' + new Date().getTime();
-    }
 
-    setInterval(refreshImage, 100);  // Refresh every 100 milliseconds
-</script>
 
 {% endblock %}
 

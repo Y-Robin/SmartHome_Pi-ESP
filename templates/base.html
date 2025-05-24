@@ -19,13 +19,14 @@
         <a href="/camera">Camera</a>
         <a href="/streamEsp">ESP-Stream</a>
         <a href="/temperature">Temperature Bad</a>
-	<a href="/stepper">Stepper Motor Control</a>
-	<a href="/videoLib">Videos</a>
+        <a href="/stepper">Stepper Motor Control</a>
+        <a href="/videoLib">Videos</a>
+        <a href="/robot">Roboter</a> <!-- Neuer Reiter für Roboter -->
     </div>
 
     <div class="content">
         {% block content %}
-        <!-- Content will be overridden in child templates -->
+        <!-- Hier wird der Inhalt der Kind-Templates eingebunden -->
         {% endblock %}
     </div>
 
@@ -34,8 +35,7 @@
     </div>
 
     {% block scripts %}
-    <!-- Additional scripts can be added in child templates -->
+    <!-- Zusätzliche Scripts können in den Kind-Templates eingebunden werden -->
     {% endblock %}
 </body>
 </html>
-

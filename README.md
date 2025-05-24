@@ -43,6 +43,8 @@ pip install flask_httpauth
 pip install opencv-python
 pip install numpy
 pip install Pillow
+pip install picamera
+pip install tflite
 ```
 #### Hardware and Software Setup
 ##### 1. Raspberry Pi Setup:

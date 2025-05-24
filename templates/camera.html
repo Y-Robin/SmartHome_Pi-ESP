@@ -20,7 +20,7 @@
         margin: 10px;
     }
 
-    #recordButton {
+    .control-button {
         padding: 10px 20px;
         font-size: 16px;
         color: white;
@@ -29,9 +29,10 @@
         border-radius: 5px;
         cursor: pointer;
         transition: background-color 0.3s;
+        margin: 5px;
     }
 
-    #recordButton:hover {
+    .control-button:hover {
         background-color: #0056b3;
     }
 
@@ -55,9 +56,10 @@
 
 <div class="camera-container">
     <h1>Pi Camera Stream</h1>
-    <img id="stream" src="/stream" alt="Camera Stream">
+    <img id="stream" src="/stream?mjpeg=1" alt="Camera Stream">
     <div class="button-container">
-        <button id="recordButton" onclick="toggleRecording()">Start Recording</button>
+        <button id="recordButton" class="control-button" onclick="toggleRecording()">Start Recording</button>
+        <button id="landmarkButton" class="control-button" onclick="toggleLandmarks()">Enable Landmarks</button>
         <div id="recordingStatus" class="not-recording">Not Recording</div>
     </div>
 </div>
@@ -66,19 +68,15 @@
 {% block scripts %}
 <script>
     var isRecording = false;
-
-    function refreshImage() {
-        const streamImage = document.getElementById('stream');
-        streamImage.src = '/stream?' + new Date().getTime();
-    }
+    var landmarksEnabled = false;
 
     function updateRecordingStatus() {
         fetch('/recording_status')
             .then(response => response.json())
             .then(data => {
                 isRecording = data.recording;
-                var statusDiv = document.getElementById('recordingStatus');
-                var button = document.getElementById('recordButton');
+                const statusDiv = document.getElementById('recordingStatus');
+                const button = document.getElementById('recordButton');
                 if (isRecording) {
                     statusDiv.innerHTML = 'Recording...';
                     statusDiv.className = 'recording';
@@ -92,15 +90,20 @@
     }
 
     function toggleRecording() {
-        if (isRecording) {
-            fetch('/stop_recording', { method: 'POST' });
-        } else {
-            fetch('/start_recording', { method: 'POST' });
-        }
+        const url = isRecording ? '/stop_recording' : '/start_recording';
+        fetch(url, { method: 'POST' });
     }
 
-    setInterval(refreshImage, 100);
-    setInterval(updateRecordingStatus, 100);
+    function toggleLandmarks() {
+        fetch('/toggle_landmarks', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                landmarksEnabled = data.landmark_detection;
+                const button = document.getElementById('landmarkButton');
+                button.textContent = landmarksEnabled ? 'Disable Landmarks' : 'Enable Landmarks';
+            });
+    }
+
+    setInterval(updateRecordingStatus, 1000);
 </script>
 {% endblock %}
-

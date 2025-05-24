@@ -115,24 +115,32 @@
 	
 
 	function updateChartForSelectedDevice() {
-            const selectedDevice = document.getElementById('deviceSelect').value;
-            fetch('/get_temperature_data?device_id=' + selectedDevice)
-                .then(response => response.json())
-                .then(data => {
-                    globalData = data; // Store fetched data in global variable
-                    updateChartForDate(); // Update chart with the new data
-                });
-        }
 
-        function loadDataForSelectedDate() {
-            const selectedDateValue = document.getElementById('selectedDate').value;
-            if (selectedDateValue) {
-                updateChartForDate(selectedDateValue);
-            } else {
-                // Handle case where no date is selected, maybe reload last 24 hours data
-                updateChartForDate();
-            }
-        }
+	    const selectedDevice = document.getElementById('deviceSelect').value;
+
+	    const selectedDateValue = document.getElementById('selectedDate').value;
+
+
+
+	    fetch(`/get_temperature_data?device_id=${selectedDevice}&date=${selectedDateValue || ''}`)
+
+		.then(response => response.json())
+
+		.then(data => {
+
+		    globalData = data;
+
+		    updateChartWithData(globalData);
+
+		});
+
+	}
+
+	function loadDataForSelectedDate() {
+
+	    updateChartForSelectedDevice();
+
+	}
 
         document.addEventListener('DOMContentLoaded', function() {
 		updateChartForSelectedDevice(); // Load data for the default selected device on page load
@@ -143,5 +151,4 @@
 
     </script>
 {% endblock %}
-
 
