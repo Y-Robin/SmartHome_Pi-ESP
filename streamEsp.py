@@ -141,14 +141,21 @@ def stream_img(cam_id):
                         writer.release()
                         print(f"[OK] AVI gespeichert: {avi_path}")
 
-                        # === ffmpeg: in optimiertes MP4 umwandeln ===
                         result = subprocess.run([
-                            "ffmpeg", "-i", str(avi_path),
-                            "-movflags", "+faststart",
-                            "-c:v", "libx264", "-preset", "veryfast",
+                            "/usr/bin/ffmpeg",  # <-- vollständiger Pfad!
+                            "-i", str(avi_path),
+                            "-c:v", "libx264",
+                            "-preset", "veryfast",
                             "-crf", "23",
-                            "-y", str(mp4_path)
+                            "-movflags", "+faststart",
+                            "-y",
+                            str(mp4_path)
                         ], capture_output=True, text=True)
+
+                        # Schreibe ffmpeg-Ausgabe in Datei (für Service-Log)
+                        with open("/tmp/ffmpeg_log.txt", "w") as log_file:
+                            log_file.write("STDOUT:\n" + result.stdout)
+                            log_file.write("\nSTDERR:\n" + result.stderr)
 
                         if result.returncode != 0:
                             print(f"[FFMPEG ERROR]\n{result.stderr}")
