@@ -35,7 +35,6 @@ camera_devices = config.get("camera_devices", {})
 states = {}
 shared_frames = {}
 
-
 def init_state(cam_id):
     if cam_id not in states:
         states[cam_id] = {
@@ -52,14 +51,12 @@ def init_state(cam_id):
             "filename": None
         }
 
-
 def detect_landmarks(rgb_img):
     img_resized = cv2.resize(rgb_img, (INPUT_SIZE, INPUT_SIZE))
     input_data = np.expand_dims(img_resized.astype(np.uint8), axis=0)
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
     return interpreter.get_tensor(output_details[0]['index'])[0, 0]
-
 
 def draw_landmarks(frame_bgr, keypoints):
     h, w, _ = frame_bgr.shape
@@ -74,7 +71,6 @@ def draw_landmarks(frame_bgr, keypoints):
         if points[i][2] > KEYPOINT_SCORE_THRES and points[j][2] > KEYPOINT_SCORE_THRES:
             cv2.line(frame_bgr, points[i][:2], points[j][:2], (0, 255, 255), 1)
 
-
 def start_stream_thread(cam_id, source_type, cam_ip, port):
     def capture_loop():
         if source_type == "robot":
@@ -84,8 +80,22 @@ def start_stream_thread(cam_id, source_type, cam_ip, port):
                 ret, frame = cap.read()
                 cap.release()
                 if ret:
+                    if states[cam_id]["landmarks"]:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        keypoints = detect_landmarks(rgb)
+                        draw_landmarks(frame, keypoints)
                     with shared_frames[cam_id]["lock"]:
-                        shared_frames[cam_id]["frame"] = frame
+                        shared_frames[cam_id]["frame"] = frame.copy()
+                        if states[cam_id]["recording"]:
+                            if not shared_frames[cam_id]["recording"]:
+                                shared_frames[cam_id]["recording"] = True
+                                shared_frames[cam_id]["buffer"] = []
+                                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                                shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
+                            shared_frames[cam_id]["buffer"].append(frame.copy())
+                        elif shared_frames[cam_id]["recording"]:
+                            shared_frames[cam_id]["recording"] = False
+                            save_recording(cam_id)
                 time.sleep(0.2)
         else:
             stream_url = f"http://{cam_ip}:{port}/stream"
@@ -93,12 +103,12 @@ def start_stream_thread(cam_id, source_type, cam_ip, port):
             while cap.isOpened():
                 ret, frame = cap.read()
                 if ret:
+                    if states[cam_id]["landmarks"]:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        keypoints = detect_landmarks(rgb)
+                        draw_landmarks(frame, keypoints)
                     with shared_frames[cam_id]["lock"]:
                         shared_frames[cam_id]["frame"] = frame.copy()
-                        if states[cam_id]["landmarks"]:
-                            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                            keypoints = detect_landmarks(rgb)
-                            draw_landmarks(frame, keypoints)
                         if states[cam_id]["recording"]:
                             if not shared_frames[cam_id]["recording"]:
                                 shared_frames[cam_id]["recording"] = True
@@ -115,7 +125,6 @@ def start_stream_thread(cam_id, source_type, cam_ip, port):
 
     thread = threading.Thread(target=capture_loop, daemon=True)
     thread.start()
-
 
 def save_recording(cam_id):
     frame_buffer = shared_frames[cam_id]["buffer"]
@@ -144,17 +153,14 @@ def save_recording(cam_id):
         except Exception as e:
             print(f"[ERROR] Aufnahmefehler bei {cam_id}: {e}")
 
-
 @streaming_blueprint.route('/streamEsp')
 def default_stream():
     first_cam_id = next(iter(camera_devices))
     return redirect(url_for('streaming.streamEsp', cam_id=first_cam_id))
 
-
 @streaming_blueprint.route('/streamEsp/<cam_id>')
 def streamEsp(cam_id):
     return render_template('streamEsp.html', cam_id=cam_id, cameras=camera_devices)
-
 
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
@@ -184,13 +190,11 @@ def stream_img(cam_id):
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-
 @streaming_blueprint.route('/start_recording/<cam_id>', methods=['POST'])
 def start_recording(cam_id):
     init_state(cam_id)
     states[cam_id]["recording"] = True
     return '', 204
-
 
 @streaming_blueprint.route('/stop_recording/<cam_id>', methods=['POST'])
 def stop_recording(cam_id):
@@ -198,13 +202,11 @@ def stop_recording(cam_id):
     states[cam_id]["recording"] = False
     return '', 204
 
-
 @streaming_blueprint.route('/toggle_landmarks/<cam_id>', methods=['POST'])
 def toggle_landmarks(cam_id):
     init_state(cam_id)
     states[cam_id]["landmarks"] = not states[cam_id]["landmarks"]
     return jsonify({"landmarks_enabled": states[cam_id]["landmarks"]})
-
 
 @streaming_blueprint.route('/recording_status/<cam_id>')
 def recording_status(cam_id):
