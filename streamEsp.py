@@ -123,37 +123,41 @@ def stream_img(cam_id):
                 print(f"[INFO] Stoppe Aufnahme für {cam_id}")
                 recording_active = False
                 if frame_buffer:
-                    out_path = Path("static/videos") / filename
-                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    avi_filename = f"{cam_id}_{timestamp}.avi"
+                    mp4_filename = f"{cam_id}_{timestamp}.mp4"
+
+                    avi_path = Path("static/videos") / avi_filename
+                    mp4_path = Path("static/videos") / mp4_filename
+
+                    avi_path.parent.mkdir(parents=True, exist_ok=True)
                     h, w = frame.shape[:2]
 
                     try:
-                        # Datei schreiben
-                        writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
+                        # === .avi speichern ===
+                        writer = cv2.VideoWriter(str(avi_path), cv2.VideoWriter_fourcc(*'MJPG'), 20, (w, h))
                         for f in frame_buffer[:max_frames]:
                             writer.write(f)
                         writer.release()
-                        print(f"[OK] Video gespeichert: {out_path}")
+                        print(f"[OK] AVI gespeichert: {avi_path}")
 
-                        # === ffmpeg: optimieren für Browser ===
-                        fixed_path = out_path.with_name("fixed_" + out_path.name)
+                        # === ffmpeg: in optimiertes MP4 umwandeln ===
                         result = subprocess.run([
-                            "ffmpeg", "-i", str(out_path),
+                            "ffmpeg", "-i", str(avi_path),
                             "-movflags", "+faststart",
-                            "-c", "copy",
-                            "-y",
-                            str(fixed_path)
+                            "-c:v", "libx264", "-preset", "veryfast",
+                            "-crf", "23",
+                            "-y", str(mp4_path)
                         ], capture_output=True, text=True)
 
                         if result.returncode != 0:
-                            print(f"[FFMPEG ERROR] {result.stderr}")
+                            print(f"[FFMPEG ERROR]\n{result.stderr}")
                         else:
-                            out_path.unlink()
-                            fixed_path.rename(out_path)
-                            print(f"[OK] Web-optimiertes Video: {out_path.name}")
+                            avi_path.unlink()  # AVI löschen
+                            print(f"[OK] MP4 erstellt und optimiert für Web: {mp4_path.name}")
 
                     except Exception as e:
-                        print(f"[ERROR] Fehler beim Speichern oder Konvertieren: {e}")
+                        print(f"[ERROR] Beim Speichern oder Konvertieren: {e}")
 
                 frame_buffer = []
 
