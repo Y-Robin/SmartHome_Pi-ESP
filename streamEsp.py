@@ -81,41 +81,62 @@ def stream_img(cam_id):
     port = camera_devices[cam_id].get("port", 81)
     stream_url = f"http://{cam_ip}:{port}/stream"
 
+    # Aufnahme-Kontext
+    recording_active = False
+    frame_buffer = []
+    max_frames = 2000  # optionaler Grenzwert
+    filename = None
+
     def generate():
+        nonlocal recording_active, frame_buffer, filename
+
         cap = cv2.VideoCapture(stream_url)
         if not cap.isOpened():
-            print(f"[ERROR] Stream {cam_id} nicht erreichbar.")
+            print(f"[ERROR] Kamera {cam_id} nicht erreichbar: {stream_url}")
             yield b''
             return
 
         while True:
             ret, frame = cap.read()
-            if not ret:
-                break
+            if not ret or frame is None or frame.size == 0:
+                continue  # Frame überspringen
 
             if states[cam_id]["landmarks"]:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 keypoints = detect_landmarks(rgb)
                 draw_landmarks(frame, keypoints)
 
+            # === Aufnahmeverarbeitung ===
             if states[cam_id]["recording"]:
-                with states[cam_id]["lock"]:
-                    if states[cam_id]["writer"] is None:
-                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        filename = f"{cam_id}_{timestamp}.mp4"
-                        out_path = Path("static/videos") / filename
-                        out_path.parent.mkdir(exist_ok=True)
-                        h, w = frame.shape[:2]
-                        writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
-                        states[cam_id]["writer"] = writer
-                    states[cam_id]["writer"].write(frame)
+                if not recording_active:
+                    print(f"[INFO] Starte Aufnahme für {cam_id}")
+                    recording_active = True
+                    frame_buffer = []
+                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"{cam_id}_{timestamp}.mp4"
+                frame_buffer.append(frame.copy())
             else:
-                if states[cam_id]["writer"] is not None:
-                    with states[cam_id]["lock"]:
-                        states[cam_id]["writer"].release()
-                        states[cam_id]["writer"] = None
+                if recording_active:
+                    print(f"[INFO] Stoppe Aufnahme für {cam_id}")
+                    recording_active = False
+                    if frame_buffer:
+                        out_path = Path("static/videos") / filename
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
+                        h, w = frame.shape[:2]
+                        try:
+                            writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
+                            for f in frame_buffer[:max_frames]:
+                                writer.write(f)
+                            writer.release()
+                            print(f"[OK] Video gespeichert: {out_path}")
+                        except Exception as e:
+                            print(f"[ERROR] Fehler beim Speichern: {e}")
+                    frame_buffer = []
 
+            # === MJPEG-Ausgabe ===
             _, jpeg = cv2.imencode('.jpg', frame)
+            if not _:
+                continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
             time.sleep(0.05)
 
