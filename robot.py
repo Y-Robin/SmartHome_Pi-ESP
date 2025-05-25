@@ -24,13 +24,23 @@ def default_robot():
 def robot_control(device_id):
     config = load_config()
     robot_devices = config.get("robot_devices", {})
+    camera_devices = config.get("camera_devices", {})
 
     if device_id not in robot_devices:
         return f"Robotergerät '{device_id}' nicht gefunden.", 404
+
+    # Prüfen, ob es eine Kamera mit gleichem Namen gibt
+    cam_id = None
+    for cam_name, cam in camera_devices.items():
+        if cam['ip'] == robot_devices[device_id]['ip']:
+            cam_id = cam_name
+            break
 
     return render_template(
         'robot.html',
         device_id=device_id,
         devices=robot_devices,
-        robot_ip=robot_devices[device_id]['ip']
+        robot_ip=robot_devices[device_id]['ip'],
+        cam_id=cam_id  # neu!
     )
+

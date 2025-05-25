@@ -68,7 +68,7 @@
 
     <div class="robot-control">
         <h1>Roboter: {{ device_id }}</h1>
-        <img id="snapshot" src="http://{{ robot_ip }}/snapshot" width="640" alt="Snapshot vom Roboter">
+        <img id="robotStream" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" width="640" alt="Live-Stream vom Roboter">
         <p>Bewege den Joystick, um Fahrbefehle zu senden.</p>
         <div id="joystick-container">
             <div id="joystick-handle"></div>

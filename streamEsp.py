@@ -37,29 +37,51 @@ def streamEsp(cam_id):
         cameras=camera_devices
     )
 
-# === MJPEG-Stream für eine Kamera ===
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
     if cam_id not in camera_devices:
         return f"Kamera '{cam_id}' nicht in der Konfiguration.", 404
 
-    cam_ip = camera_devices[cam_id]['ip']
-    stream_url = f"http://{cam_ip}:81/stream"
+    cam_config = camera_devices[cam_id]
+    cam_ip = cam_config['ip']
+    source = cam_config.get('source', 'esp')  # Standard ist ESP32
 
-    def generate():
-        cap = cv2.VideoCapture(stream_url)
-        if not cap.isOpened():
-            yield b''
-            return
+    if source == 'robot':
+        # Roboter liefert Snapshots → simuliere MJPEG-Stream
+        def generate_snapshots():
+            while True:
+                img_url = f"http://{cam_ip}/snapshot"
+                cap = cv2.VideoCapture(img_url)
+                ret, frame = cap.read()
+                cap.release()
+                if not ret:
+                    continue
+                _, jpeg = cv2.imencode('.jpg', frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                time.sleep(0.2)
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            _, jpeg = cv2.imencode('.jpg', frame)
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-            time.sleep(0.05)
-        cap.release()
+        return Response(generate_snapshots(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    else:
+        # ESP32-CAM MJPEG-Stream
+        port = cam_config.get("port", 81)
+        stream_url = f"http://{cam_ip}:{port}/stream"
+
+        def generate():
+            cap = cv2.VideoCapture(stream_url)
+            if not cap.isOpened():
+                yield b''
+                return
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                _, jpeg = cv2.imencode('.jpg', frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                time.sleep(0.05)
+            cap.release()
+
+        return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
