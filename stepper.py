@@ -1,58 +1,73 @@
-from flask import Blueprint, request, render_template
+from flask import Blueprint, request, render_template, redirect, url_for
 import requests
-from flask_httpauth import HTTPBasicAuth
 import yaml
 from pathlib import Path
+from flask_httpauth import HTTPBasicAuth
 
 def load_config():
     with open(Path("config.yaml"), 'r') as file:
         return yaml.safe_load(file)
 
 def create_stepper_blueprint():
-
     config = load_config()
-    # Finde die IP von dem ESP, der das Stepper-Modul hat
-    stepper_device_ip = None
-    for device in config["devices"].values():
-        if "Stepper" in device["elements"]:
-            stepper_device_ip = f"http://{device['ip']}"
-            break
+    stepper_devices = config.get("stepper_devices", {})
 
-    if not stepper_device_ip:
-        raise ValueError("Kein Gerät mit Stepper-Element in der config.yaml gefunden.")
-
+    if not stepper_devices:
+        raise ValueError("Keine Stepper-Geräte in config.yaml gefunden.")
 
     auth = HTTPBasicAuth()
     users = {
-        "root": "root",  # Replace with your desired username and password
+        "root": "root",  # Passwort anpassen
     }
 
     @auth.verify_password
     def verify_password(username, password):
-        if username in users:
-            return users.get(username) == password
-        return False
+        return users.get(username) == password
 
     stepper_blueprint = Blueprint('stepper', __name__, template_folder='templates')
-    ESP8266_IP = stepper_device_ip  # Replace with the IP of your ESP8266
 
+    # Standard-Route zur ersten verfügbaren Stepper
     @stepper_blueprint.route('/stepper')
-    @auth.login_required  # This decorator should be applied directly to the route function
-    def stepper():
-        return render_template('stepper.html')
+    @auth.login_required
+    def default_stepper():
+        first_stepper = next(iter(stepper_devices))
+        return redirect(url_for('stepper.stepper_control', device_id=first_stepper))
 
-    @stepper_blueprint.route('/set_angle', methods=['POST'])
-    def set_angle():
+    # Steuerungs-UI
+    @stepper_blueprint.route('/stepper/<device_id>')
+    @auth.login_required
+    def stepper_control(device_id):
+        if device_id not in stepper_devices:
+            return f"Unbekanntes Stepper-Device '{device_id}'", 404
+        return render_template('stepper.html', device_id=device_id, devices=stepper_devices)
+
+    # Winkel setzen
+    @stepper_blueprint.route('/set_angle/<device_id>', methods=['POST'])
+    def set_angle(device_id):
+        devices = load_config().get("stepper_devices", {})
+        if device_id not in devices:
+            return "Ungültiges Gerät", 404
         angle = request.form.get('angle')
+        ip = devices[device_id]['ip']
         if angle:
-            requests.get(f"{ESP8266_IP}/set_angle?angle={angle}")
-            return "Angle set to " + angle
-        else:
-            return "No angle provided", 400
+            try:
+                r = requests.get(f"http://{ip}/set_angle?angle={angle}")
+                return r.text or f"Winkel gesetzt auf {angle}"
+            except Exception as e:
+                return f"Fehler: {e}", 500
+        return "Kein Winkel angegeben", 400
 
-    @stepper_blueprint.route('/get_angle')
-    def get_angle():
-        response = requests.get(f"{ESP8266_IP}/get_angle")
-        return response.text
+    # Aktuellen Winkel holen
+    @stepper_blueprint.route('/get_angle/<device_id>')
+    def get_angle(device_id):
+        devices = load_config().get("stepper_devices", {})
+        if device_id not in devices:
+            return "Ungültiges Gerät", 404
+        ip = devices[device_id]['ip']
+        try:
+            r = requests.get(f"http://{ip}/get_angle")
+            return r.text
+        except Exception as e:
+            return f"Fehler: {e}", 500
 
     return stepper_blueprint

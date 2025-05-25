@@ -20,6 +20,8 @@ This smart home system integrates various functionalities such as camera streami
    ![Stepper Motor Control Page](Images/Stepper.png)
 6. **Video Library**: View all recorded videos from the Pi camera.
    ![Video Library Page](Images/VideoLib.png)
+7. **Robot**: View all recorded videos from the Pi camera.
+   ![Video Library Page](Images/VideoLib.png)
 
 ### Hardware
 
@@ -56,15 +58,13 @@ pip install tflite
 ![ESP-Cam Setup](Images/ESP32-Cam.jpg)
 ![ESP-Cam Setup](Images/ESP8266_Full.jpg)
 ##### 3. Network Configuration:
-	- Ensure all devices are connected to the same local network.
- 	- Ensure all IP addresses are adapted to your local network (Python, HTML, Arduino)
+	- Ensure all devices are connected to the same local network (Arduino config.sh (Example is given)).
+ 	- Ensure all IP addresses are adapted to your local network config.yaml. An example is given.
 
 ##### Running the System
-To start the system, navigate to the git folder and execute the following commands in three separate terminals:
+To start the system, navigate to the git folder and execute the following command:
 
 ```bash 
-python espCapture.py
-python stream.py
 python app.py
 ```
 

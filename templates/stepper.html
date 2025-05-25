@@ -1,15 +1,59 @@
 {% extends "base.html" %}
 
-{% block title %}Home Page{% endblock %}
+{% block title %}Stepper Control{% endblock %}
 
 {% block content %}
-<div>
-    <h1>Stepper Motor Control</h1>
-    <input type="range" id="angleSlider" min="0" max="360" value="0" oninput="updateAngleValue(this.value)">
-    <span id="angleValue">0</span>°
-    <button onclick="setAngle()">Set Angle</button>
-    <button onclick="getAngle()">Get Current Angle</button>
-    <p id="response"></p>
+<style>
+    .page-container {
+        display: flex;
+    }
+
+    .sidebar {
+        width: 200px;
+        padding: 20px;
+        border-right: 1px solid #ccc;
+    }
+
+    .sidebar ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .sidebar li {
+        margin-bottom: 10px;
+    }
+
+    .sidebar a {
+        text-decoration: none;
+        color: #007bff;
+        font-weight: bold;
+    }
+
+    .stepper-control {
+        flex-grow: 1;
+        padding: 20px;
+    }
+</style>
+
+<div class="page-container">
+    <div class="sidebar">
+        <h3>Stepper Geräte</h3>
+        <ul>
+            {% for name, dev in devices.items() %}
+                <li><a href="{{ url_for('stepper.stepper_control', device_id=name) }}">{{ name }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="stepper-control">
+        <h1>Stepper Motor: {{ device_id }}</h1>
+        <input type="range" id="angleSlider" min="0" max="360" value="0" oninput="updateAngleValue(this.value)">
+        <span id="angleValue">0</span>°
+        <br><br>
+        <button onclick="setAngle()">Set Angle</button>
+        <button onclick="getAngle()">Get Current Angle</button>
+        <p id="response"></p>
+    </div>
 </div>
 {% endblock %}
 
@@ -21,26 +65,21 @@
 
     function setAngle() {
         var angle = document.getElementById('angleSlider').value;
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/set_angle', true);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4 && xhr.status == 200) {
-                document.getElementById('response').innerText = xhr.responseText;
-            }
-        }
-        xhr.send('angle=' + angle);
+        fetch("/set_angle/{{ device_id }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "angle=" + angle
+        })
+        .then(res => res.text())
+        .then(data => document.getElementById('response').innerText = data)
+        .catch(err => document.getElementById('response').innerText = "Fehler: " + err);
     }
 
     function getAngle() {
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', '/get_angle', true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4 && xhr.status == 200) {
-                document.getElementById('response').innerText = 'Current Angle: ' + xhr.responseText;
-            }
-        }
-        xhr.send();
+        fetch("/get_angle/{{ device_id }}")
+        .then(res => res.text())
+        .then(data => document.getElementById('response').innerText = "Current Angle: " + data)
+        .catch(err => document.getElementById('response').innerText = "Fehler: " + err);
     }
 </script>
 {% endblock %}
