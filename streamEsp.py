@@ -26,7 +26,6 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-
 def load_config():
     with open(Path("config.yaml"), "r") as file:
         return yaml.safe_load(file)
@@ -47,7 +46,10 @@ def init_state(cam_id):
     if cam_id not in shared_frames:
         shared_frames[cam_id] = {
             "frame": None,
-            "lock": threading.Lock()
+            "lock": threading.Lock(),
+            "recording": False,
+            "buffer": [],
+            "filename": None
         }
 
 
@@ -92,13 +94,55 @@ def start_stream_thread(cam_id, source_type, cam_ip, port):
                 ret, frame = cap.read()
                 if ret:
                     with shared_frames[cam_id]["lock"]:
-                        shared_frames[cam_id]["frame"] = frame
+                        shared_frames[cam_id]["frame"] = frame.copy()
+                        if states[cam_id]["landmarks"]:
+                            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            keypoints = detect_landmarks(rgb)
+                            draw_landmarks(frame, keypoints)
+                        if states[cam_id]["recording"]:
+                            if not shared_frames[cam_id]["recording"]:
+                                shared_frames[cam_id]["recording"] = True
+                                shared_frames[cam_id]["buffer"] = []
+                                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                                shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
+                            shared_frames[cam_id]["buffer"].append(frame.copy())
+                        elif shared_frames[cam_id]["recording"]:
+                            shared_frames[cam_id]["recording"] = False
+                            save_recording(cam_id)
                 else:
                     time.sleep(0.1)
             cap.release()
 
     thread = threading.Thread(target=capture_loop, daemon=True)
     thread.start()
+
+
+def save_recording(cam_id):
+    frame_buffer = shared_frames[cam_id]["buffer"]
+    filename = shared_frames[cam_id]["filename"]
+    if frame_buffer and filename:
+        avi_path = Path("static/videos") / f"{filename}.avi"
+        mp4_path = Path("static/videos") / f"{filename}.mp4"
+        avi_path.parent.mkdir(parents=True, exist_ok=True)
+        h, w = frame_buffer[0].shape[:2]
+        try:
+            writer = cv2.VideoWriter(str(avi_path), cv2.VideoWriter_fourcc(*'MJPG'), 5, (w, h))
+            for f in frame_buffer[:2000]:
+                writer.write(f)
+            writer.release()
+            result = subprocess.run([
+                "/usr/bin/ffmpeg",
+                "-i", str(avi_path),
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-crf", "23",
+                "-movflags", "+faststart",
+                "-y", str(mp4_path)
+            ], capture_output=True, text=True)
+            if result.returncode == 0:
+                avi_path.unlink()
+        except Exception as e:
+            print(f"[ERROR] Aufnahmefehler bei {cam_id}: {e}")
 
 
 @streaming_blueprint.route('/streamEsp')
@@ -124,11 +168,6 @@ def stream_img(cam_id):
         start_stream_thread(cam_id, source_type, cam_ip, port)
 
     def generate():
-        recording_active = False
-        frame_buffer = []
-        max_frames = 2000
-        filename = None
-
         while True:
             with shared_frames[cam_id]["lock"]:
                 frame = shared_frames[cam_id]["frame"].copy() if shared_frames[cam_id]["frame"] is not None else None
@@ -136,49 +175,6 @@ def stream_img(cam_id):
             if frame is None:
                 time.sleep(0.05)
                 continue
-
-            if states[cam_id]["landmarks"]:
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                keypoints = detect_landmarks(rgb)
-                draw_landmarks(frame, keypoints)
-
-            if states[cam_id]["recording"]:
-                if not recording_active:
-                    recording_active = True
-                    frame_buffer = []
-                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"{cam_id}_{timestamp}"
-                frame_buffer.append(frame.copy())
-            elif recording_active:
-                recording_active = False
-                if frame_buffer:
-                    avi_path = Path("static/videos") / f"{filename}.avi"
-                    mp4_path = Path("static/videos") / f"{filename}.mp4"
-                    avi_path.parent.mkdir(parents=True, exist_ok=True)
-                    h, w = frame.shape[:2]
-
-                    try:
-                        writer = cv2.VideoWriter(str(avi_path), cv2.VideoWriter_fourcc(*'MJPG'), 5, (w, h))
-                        for f in frame_buffer[:max_frames]:
-                            writer.write(f)
-                        writer.release()
-
-                        result = subprocess.run([
-                            "/usr/bin/ffmpeg",
-                            "-i", str(avi_path),
-                            "-c:v", "libx264",
-                            "-preset", "veryfast",
-                            "-crf", "23",
-                            "-movflags", "+faststart",
-                            "-y", str(mp4_path)
-                        ], capture_output=True, text=True)
-
-                        if result.returncode == 0:
-                            avi_path.unlink()
-                    except Exception as e:
-                        print(f"[ERROR] Aufnahmefehler: {e}")
-
-                frame_buffer = []
 
             success, jpeg = cv2.imencode('.jpg', frame)
             if not success:
