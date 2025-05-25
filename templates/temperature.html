@@ -7,9 +7,7 @@
     <div id="device-selector-container">
         <label for="deviceSelect">Select Device:</label>
         <select id="deviceSelect" onchange="updateChartForSelectedDevice()">
-            <option value="ESP_01">ESP_01</option>
-            <option value="ESP_02">ESP_02</option>
-            <option value="ESP_03">ESP_03</option>
+            <!-- Dynamisch per JS befüllt -->
         </select>
     </div>
 
@@ -80,6 +78,32 @@
                     }
                 }
         }
+        });
+
+
+        function loadAvailableDevices() {
+            fetch('/get_available_devices')
+                .then(response => response.json())
+                .then(devices => {
+                    const deviceSelect = document.getElementById('deviceSelect');
+                    deviceSelect.innerHTML = ''; // Clear existing options
+
+                    devices.forEach(deviceId => {
+                        const option = document.createElement('option');
+                        option.value = deviceId;
+                        option.textContent = deviceId;
+                        deviceSelect.appendChild(option);
+                    });
+
+                    // Lade das Chart mit dem ersten Gerät
+                    if (devices.length > 0) {
+                        updateChartForSelectedDevice();
+                    }
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailableDevices();
         });
 
         function updateChartWithData(filteredData) {

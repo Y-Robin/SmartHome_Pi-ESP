@@ -17,6 +17,12 @@ def create_temperature_blueprint(socketio, db):
     @temperature_blueprint.route('/temperature')
     def temperature():
         return render_template('temperature.html')
+    
+    @temperature_blueprint.route('/get_available_devices')
+    def get_available_devices():
+        devices = db.session.query(TemperatureData.device_id).distinct().all()
+        device_list = [device[0] for device in devices]
+        return jsonify(device_list)
 
     @temperature_blueprint.route('/record_temperature', methods=['POST'])
     def record_temperature():
