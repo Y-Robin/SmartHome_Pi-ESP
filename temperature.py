@@ -3,6 +3,14 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from sqlalchemy import and_
+import yaml
+import os
+
+def load_devices_from_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return list(config.get('devices', {}).keys())
 
 def create_temperature_blueprint(socketio, db):
     temperature_blueprint = Blueprint('temperature', __name__)
@@ -20,8 +28,7 @@ def create_temperature_blueprint(socketio, db):
     
     @temperature_blueprint.route('/get_available_devices')
     def get_available_devices():
-        devices = db.session.query(TemperatureData.device_id).distinct().all()
-        device_list = [device[0] for device in devices]
+        device_list = load_devices_from_config()
         return jsonify(device_list)
 
     @temperature_blueprint.route('/record_temperature', methods=['POST'])
