@@ -4,42 +4,29 @@
 
 {% block content %}
 <style>
-    .page-container {
-        display: flex;
-    }
-
+    .page-container { display: flex; }
     .sidebar {
         width: 200px;
         padding: 20px;
         border-right: 1px solid #ccc;
     }
-
-    .sidebar ul {
-        list-style: none;
-        padding: 0;
-    }
-
-    .sidebar li {
-        margin-bottom: 10px;
-    }
-
-    .sidebar a {
-        text-decoration: none;
-        color: #007bff;
-        font-weight: bold;
-    }
-
     .camera-container {
         flex-grow: 1;
         text-align: center;
         padding: 20px;
     }
-
     #streamEsp {
         max-width: 100%;
         height: auto;
         border: 3px solid #ddd;
         margin-bottom: 10px;
+    }
+    .control-buttons {
+        margin-top: 10px;
+    }
+    .control-buttons button {
+        padding: 10px 15px;
+        margin: 5px;
     }
 </style>
 
@@ -56,30 +43,60 @@
     <div class="camera-container">
         <h1>Stream von {{ cam_id }}</h1>
         <img id="streamEsp" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="Camera Stream">
+
         <div class="slider-container">
             <label for="ledSlider">LED Helligkeit:</label>
-            <input type="range" id="ledSlider" name="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
+            <input type="range" id="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
             <span id="ledValue">0</span>
+        </div>
+
+        <div class="control-buttons">
+            <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+            <button id="motionBtn" onclick="toggleMotion()">Enable Motion Detection</button>
+            <div id="recordStatus">Not Recording</div>
         </div>
     </div>
 </div>
 
 <script>
+    const cam_id = "{{ cam_id }}";
     const esp32_ip = "{{ cameras[cam_id]['ip'] }}";
+    let isRecording = false;
+    let motionEnabled = false;
 
     function updateLed(val) {
         document.getElementById("ledValue").textContent = val;
-        fetch(`http://${esp32_ip}/control?var=led_intensity&val=${val}`)
-            .then(response => {
-                if (!response.ok) {
-                    console.error('Fehler beim Senden an ESP32');
-                }
-            })
-            .catch(error => {
-                console.error('Verbindungsfehler:', error);
+        fetch(`http://${esp32_ip}/control?var=led_intensity&val=${val}`);
+    }
+
+    function toggleRecording() {
+        const url = isRecording
+            ? `/stop_recording/${cam_id}`
+            : `/start_recording/${cam_id}`;
+        fetch(url, { method: 'POST' }).then(updateRecordingStatus);
+    }
+
+    function toggleMotion() {
+        fetch(`/toggle_motion/${cam_id}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                motionEnabled = data.motion_enabled;
+                document.getElementById("motionBtn").textContent = motionEnabled
+                    ? "Disable Motion Detection"
+                    : "Enable Motion Detection";
             });
     }
+
+    function updateRecordingStatus() {
+        fetch(`/recording_status/${cam_id}`)
+            .then(res => res.json())
+            .then(data => {
+                isRecording = data.recording;
+                document.getElementById("recordStatus").textContent = isRecording ? "Recording..." : "Not Recording";
+                document.getElementById("recordBtn").textContent = isRecording ? "Stop Recording" : "Start Recording";
+            });
+    }
+
+    setInterval(updateRecordingStatus, 1000);
 </script>
 {% endblock %}
-
-
