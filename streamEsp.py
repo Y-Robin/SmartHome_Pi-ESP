@@ -34,7 +34,6 @@ def load_config():
 
 config = load_config()
 camera_devices = config.get("camera_devices", {})
-
 states = {}
 
 def init_state(cam_id):
@@ -78,104 +77,99 @@ def streamEsp(cam_id):
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
     init_state(cam_id)
-    cam_ip = camera_devices[cam_id]['ip']
-    port = camera_devices[cam_id].get("port", 81)
-    stream_url = f"http://{cam_ip}:{port}/stream"
+    cam_config = camera_devices[cam_id]
+    cam_ip = cam_config['ip']
+    source_type = cam_config.get("source", "esp")
 
-    # Aufnahme-Kontext
     recording_active = False
     frame_buffer = []
     max_frames = 2000
     filename = None
 
+    def get_robot_snapshot():
+        snapshot_url = f"http://{cam_ip}/snapshot"
+        cap = cv2.VideoCapture(snapshot_url)
+        ret, frame = cap.read()
+        cap.release()
+        return ret, frame
+
     def generate():
         nonlocal recording_active, frame_buffer, filename
 
-        cap = cv2.VideoCapture(stream_url)
-        if not cap.isOpened():
-            print(f"[ERROR] Kamera {cam_id} nicht erreichbar: {stream_url}")
-            yield b''
-            return
+        cap = None
+        if source_type != "robot":
+            stream_url = f"http://{cam_ip}:{cam_config.get('port', 81)}/stream"
+            cap = cv2.VideoCapture(stream_url)
+            if not cap.isOpened():
+                print(f"[ERROR] Kamera {cam_id} nicht erreichbar: {stream_url}")
+                yield b''
+                return
 
         while True:
-            ret, frame = cap.read()
-            if not ret or frame is None or frame.size == 0:
-                continue  # Frame überspringen
+            if source_type == "robot":
+                ret, frame = get_robot_snapshot()
+                time.sleep(0.2)
+            else:
+                ret, frame = cap.read()
 
-            # Pose-Detection (optional)
+            if not ret or frame is None or frame.size == 0:
+                continue
+
             if states[cam_id]["landmarks"]:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 keypoints = detect_landmarks(rgb)
                 draw_landmarks(frame, keypoints)
 
-            # === Aufnahme starten ===
             if states[cam_id]["recording"]:
                 if not recording_active:
-                    print(f"[INFO] Starte Aufnahme für {cam_id}")
                     recording_active = True
                     frame_buffer = []
                     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"{cam_id}_{timestamp}.mp4"
+                    filename = f"{cam_id}_{timestamp}"
                 frame_buffer.append(frame.copy())
-
-            # === Aufnahme stoppen und speichern ===
             elif recording_active:
-                print(f"[INFO] Stoppe Aufnahme für {cam_id}")
                 recording_active = False
                 if frame_buffer:
-                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                    avi_filename = f"{cam_id}_{timestamp}.avi"
-                    mp4_filename = f"{cam_id}_{timestamp}.mp4"
-
-                    avi_path = Path("static/videos") / avi_filename
-                    mp4_path = Path("static/videos") / mp4_filename
-
+                    avi_path = Path("static/videos") / f"{filename}.avi"
+                    mp4_path = Path("static/videos") / f"{filename}.mp4"
                     avi_path.parent.mkdir(parents=True, exist_ok=True)
                     h, w = frame.shape[:2]
 
                     try:
-                        # === .avi speichern ===
-                        writer = cv2.VideoWriter(str(avi_path), cv2.VideoWriter_fourcc(*'MJPG'), 20, (w, h))
+                        writer = cv2.VideoWriter(str(avi_path), cv2.VideoWriter_fourcc(*'MJPG'), 5, (w, h))
                         for f in frame_buffer[:max_frames]:
                             writer.write(f)
                         writer.release()
-                        print(f"[OK] AVI gespeichert: {avi_path}")
 
                         result = subprocess.run([
-                            "/usr/bin/ffmpeg",  # <-- vollständiger Pfad!
+                            "/usr/bin/ffmpeg",
                             "-i", str(avi_path),
                             "-c:v", "libx264",
                             "-preset", "veryfast",
                             "-crf", "23",
                             "-movflags", "+faststart",
-                            "-y",
-                            str(mp4_path)
+                            "-y", str(mp4_path)
                         ], capture_output=True, text=True)
 
-                        # Schreibe ffmpeg-Ausgabe in Datei (für Service-Log)
                         with open("/tmp/ffmpeg_log.txt", "w") as log_file:
                             log_file.write("STDOUT:\n" + result.stdout)
                             log_file.write("\nSTDERR:\n" + result.stderr)
 
-                        if result.returncode != 0:
-                            print(f"[FFMPEG ERROR]\n{result.stderr}")
-                        else:
-                            avi_path.unlink()  # AVI löschen
-                            print(f"[OK] MP4 erstellt und optimiert für Web: {mp4_path.name}")
-
+                        if result.returncode == 0:
+                            avi_path.unlink()
                     except Exception as e:
-                        print(f"[ERROR] Beim Speichern oder Konvertieren: {e}")
+                        print(f"[ERROR] Aufnahmefehler: {e}")
 
                 frame_buffer = []
 
-            # === MJPEG-Ausgabe ===
             success, jpeg = cv2.imencode('.jpg', frame)
             if not success:
                 continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
             time.sleep(0.05)
 
-        cap.release()
+        if cap:
+            cap.release()
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
