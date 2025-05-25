@@ -40,7 +40,7 @@
         <div class="video-item">
             <h3>{{ video_file }}</h3>
             <video controls>
-                <source src="{{ url_for('static', filename='videos/' + video_file) }}" type="video/mp4">
+                <source src="{{ url_for('static', filename='videos/' ~ video_file) }}" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
         </div>
