@@ -48,7 +48,8 @@ def init_state(cam_id):
             "lock": threading.Lock(),
             "recording": False,
             "buffer": [],
-            "filename": None
+            "filename": None,
+            "thread": None
         }
 
 def detect_landmarks(rgb_img):
@@ -73,58 +74,62 @@ def draw_landmarks(frame_bgr, keypoints):
 
 def start_stream_thread(cam_id, source_type, cam_ip, port):
     def capture_loop():
-        if source_type == "robot":
-            snapshot_url = f"http://{cam_ip}/snapshot"
-            while True:
-                cap = cv2.VideoCapture(snapshot_url)
-                ret, frame = cap.read()
-                cap.release()
-                if ret:
-                    if states[cam_id]["landmarks"]:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        keypoints = detect_landmarks(rgb)
-                        draw_landmarks(frame, keypoints)
-                    with shared_frames[cam_id]["lock"]:
-                        shared_frames[cam_id]["frame"] = frame.copy()
-                        if states[cam_id]["recording"]:
-                            if not shared_frames[cam_id]["recording"]:
-                                shared_frames[cam_id]["recording"] = True
-                                shared_frames[cam_id]["buffer"] = []
-                                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                                shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
-                            shared_frames[cam_id]["buffer"].append(frame.copy())
-                        elif shared_frames[cam_id]["recording"]:
-                            shared_frames[cam_id]["recording"] = False
-                            save_recording(cam_id)
-                time.sleep(0.2)
-        else:
-            stream_url = f"http://{cam_ip}:{port}/stream"
-            cap = cv2.VideoCapture(stream_url)
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if ret:
-                    if states[cam_id]["landmarks"]:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        keypoints = detect_landmarks(rgb)
-                        draw_landmarks(frame, keypoints)
-                    with shared_frames[cam_id]["lock"]:
-                        shared_frames[cam_id]["frame"] = frame.copy()
-                        if states[cam_id]["recording"]:
-                            if not shared_frames[cam_id]["recording"]:
-                                shared_frames[cam_id]["recording"] = True
-                                shared_frames[cam_id]["buffer"] = []
-                                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                                shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
-                            shared_frames[cam_id]["buffer"].append(frame.copy())
-                        elif shared_frames[cam_id]["recording"]:
-                            shared_frames[cam_id]["recording"] = False
-                            save_recording(cam_id)
+        while True:
+            try:
+                if source_type == "robot":
+                    snapshot_url = f"http://{cam_ip}/snapshot"
+                    while True:
+                        cap = cv2.VideoCapture(snapshot_url)
+                        ret, frame = cap.read()
+                        cap.release()
+                        if ret:
+                            if states[cam_id]["landmarks"]:
+                                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                keypoints = detect_landmarks(rgb)
+                                draw_landmarks(frame, keypoints)
+                            with shared_frames[cam_id]["lock"]:
+                                shared_frames[cam_id]["frame"] = frame.copy()
+                                if states[cam_id]["recording"]:
+                                    if not shared_frames[cam_id]["recording"]:
+                                        shared_frames[cam_id]["recording"] = True
+                                        shared_frames[cam_id]["buffer"] = []
+                                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                                        shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
+                                    shared_frames[cam_id]["buffer"].append(frame.copy())
+                                elif shared_frames[cam_id]["recording"]:
+                                    shared_frames[cam_id]["recording"] = False
+                                    save_recording(cam_id)
+                        time.sleep(0.2)
                 else:
-                    time.sleep(0.1)
-            cap.release()
+                    stream_url = f"http://{cam_ip}:{port}/stream"
+                    cap = cv2.VideoCapture(stream_url)
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            raise RuntimeError("Stream read failed")
+                        if states[cam_id]["landmarks"]:
+                            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            keypoints = detect_landmarks(rgb)
+                            draw_landmarks(frame, keypoints)
+                        with shared_frames[cam_id]["lock"]:
+                            shared_frames[cam_id]["frame"] = frame.copy()
+                            if states[cam_id]["recording"]:
+                                if not shared_frames[cam_id]["recording"]:
+                                    shared_frames[cam_id]["recording"] = True
+                                    shared_frames[cam_id]["buffer"] = []
+                                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                                    shared_frames[cam_id]["filename"] = f"{cam_id}_{timestamp}"
+                                shared_frames[cam_id]["buffer"].append(frame.copy())
+                            elif shared_frames[cam_id]["recording"]:
+                                shared_frames[cam_id]["recording"] = False
+                                save_recording(cam_id)
+            except Exception as e:
+                print(f"[ERROR] Capture loop for {cam_id} crashed: {e}")
+                time.sleep(2)  # Pause before retry
 
     thread = threading.Thread(target=capture_loop, daemon=True)
     thread.start()
+    shared_frames[cam_id]["thread"] = thread
 
 def save_recording(cam_id):
     frame_buffer = shared_frames[cam_id]["buffer"]
@@ -170,7 +175,7 @@ def stream_img(cam_id):
     source_type = cam_config.get("source", "esp")
     port = cam_config.get("port", 81)
 
-    if shared_frames[cam_id]["frame"] is None:
+    if not shared_frames[cam_id].get("thread") or not shared_frames[cam_id]["thread"].is_alive():
         start_stream_thread(cam_id, source_type, cam_ip, port)
 
     def generate():
