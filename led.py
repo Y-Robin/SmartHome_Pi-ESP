@@ -26,7 +26,10 @@ def create_led_blueprint(socketio):
 
     @led_blueprint.route('/')
     def index():
-        return render_template('index.html', devices=esp_devices)
+        return render_template('index.html',
+                       devices=esp_devices,
+                       cameras=camera_devices,
+                       robots=robot_devices)
 
 
     @led_blueprint.route('/control_led/<device_id>', methods=['POST'])
