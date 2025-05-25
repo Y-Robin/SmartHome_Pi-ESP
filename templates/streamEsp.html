@@ -52,7 +52,7 @@
 
         <div class="control-buttons">
             <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
-            <button id="motionBtn" onclick="toggleMotion()">Enable Motion Detection</button>
+            <button id="landmarkBtn" onclick="toggleLandmarks()">Enable Landmarks</button>
             <div id="recordStatus">Not Recording</div>
         </div>
     </div>
@@ -62,7 +62,6 @@
     const cam_id = "{{ cam_id }}";
     const esp32_ip = "{{ cameras[cam_id]['ip'] }}";
     let isRecording = false;
-    let motionEnabled = false;
 
     function updateLed(val) {
         document.getElementById("ledValue").textContent = val;
@@ -70,21 +69,8 @@
     }
 
     function toggleRecording() {
-        const url = isRecording
-            ? `/stop_recording/${cam_id}`
-            : `/start_recording/${cam_id}`;
+        const url = isRecording ? `/stop_recording/${cam_id}` : `/start_recording/${cam_id}`;
         fetch(url, { method: 'POST' }).then(updateRecordingStatus);
-    }
-
-    function toggleMotion() {
-        fetch(`/toggle_motion/${cam_id}`, { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                motionEnabled = data.motion_enabled;
-                document.getElementById("motionBtn").textContent = motionEnabled
-                    ? "Disable Motion Detection"
-                    : "Enable Motion Detection";
-            });
     }
 
     function updateRecordingStatus() {
@@ -94,6 +80,15 @@
                 isRecording = data.recording;
                 document.getElementById("recordStatus").textContent = isRecording ? "Recording..." : "Not Recording";
                 document.getElementById("recordBtn").textContent = isRecording ? "Stop Recording" : "Start Recording";
+            });
+    }
+
+    function toggleLandmarks() {
+        fetch(`/toggle_landmarks/${cam_id}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("landmarkBtn").textContent =
+                    data.landmarks_enabled ? "Disable Landmarks" : "Enable Landmarks";
             });
     }
 

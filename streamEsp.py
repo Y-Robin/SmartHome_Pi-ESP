@@ -6,9 +6,27 @@ import datetime
 from pathlib import Path
 import threading
 import numpy as np
+import tflite_runtime.interpreter as tflite
 
 streaming_blueprint = Blueprint('streaming', __name__, template_folder='templates')
 
+# === MoveNet Setup ===
+TFLITE_MODEL_PATH = "movenet_singlepose_lightning.tflite"
+INPUT_SIZE = 192
+KEYPOINT_SCORE_THRES = 0.3
+_SKELETON_EDGES = [
+    (0, 1), (0, 2), (1, 3), (2, 4),
+    (0, 5), (0, 6), (5, 7), (7, 9), (6, 8), (8, 10),
+    (5, 6), (5, 11), (6, 12),
+    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)
+]
+
+interpreter = tflite.Interpreter(model_path=TFLITE_MODEL_PATH, num_threads=2)
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+# === Konfiguration laden ===
 def load_config():
     with open(Path("config.yaml"), "r") as file:
         return yaml.safe_load(file)
@@ -16,11 +34,36 @@ def load_config():
 config = load_config()
 camera_devices = config.get("camera_devices", {})
 
-recording_flags = {}
-motion_detection_flags = {}
-recording_writers = {}
-recording_locks = {}
-last_frames = {}
+states = {}
+
+def init_state(cam_id):
+    if cam_id not in states:
+        states[cam_id] = {
+            "recording": False,
+            "landmarks": False,
+            "writer": None,
+            "lock": threading.Lock()
+        }
+
+def detect_landmarks(rgb_img):
+    img_resized = cv2.resize(rgb_img, (INPUT_SIZE, INPUT_SIZE))
+    input_data = np.expand_dims(img_resized.astype(np.uint8), axis=0)
+    interpreter.set_tensor(input_details[0]['index'], input_data)
+    interpreter.invoke()
+    return interpreter.get_tensor(output_details[0]['index'])[0, 0]
+
+def draw_landmarks(frame_bgr, keypoints):
+    h, w, _ = frame_bgr.shape
+    points = []
+    for kp in keypoints:
+        y, x, score = kp
+        cx, cy = int(x * w), int(y * h)
+        points.append((cx, cy, score))
+        if score > KEYPOINT_SCORE_THRES:
+            cv2.circle(frame_bgr, (cx, cy), 3, (0, 255, 0), -1)
+    for i, j in _SKELETON_EDGES:
+        if points[i][2] > KEYPOINT_SCORE_THRES and points[j][2] > KEYPOINT_SCORE_THRES:
+            cv2.line(frame_bgr, points[i][:2], points[j][:2], (0, 255, 255), 1)
 
 @streaming_blueprint.route('/streamEsp')
 def default_stream():
@@ -33,19 +76,15 @@ def streamEsp(cam_id):
 
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
+    init_state(cam_id)
     cam_ip = camera_devices[cam_id]['ip']
     port = camera_devices[cam_id].get("port", 81)
     stream_url = f"http://{cam_ip}:{port}/stream"
 
-    recording_flags.setdefault(cam_id, False)
-    motion_detection_flags.setdefault(cam_id, False)
-    recording_writers[cam_id] = None
-    recording_locks[cam_id] = threading.Lock()
-    last_frames[cam_id] = None
-
     def generate():
         cap = cv2.VideoCapture(stream_url)
         if not cap.isOpened():
+            print(f"[ERROR] Stream {cam_id} nicht erreichbar.")
             yield b''
             return
 
@@ -54,36 +93,27 @@ def stream_img(cam_id):
             if not ret:
                 break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            blurred = cv2.GaussianBlur(gray, (21, 21), 0)
+            if states[cam_id]["landmarks"]:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                keypoints = detect_landmarks(rgb)
+                draw_landmarks(frame, keypoints)
 
-            motion = False
-            if motion_detection_flags[cam_id]:
-                prev = last_frames[cam_id]
-                if prev is not None:
-                    delta = cv2.absdiff(prev, blurred)
-                    thresh = cv2.threshold(delta, 25, 255, cv2.THRESH_BINARY)[1]
-                    motion = cv2.countNonZero(thresh) > 5000  # Schwelle
-                last_frames[cam_id] = blurred
-
-            should_record = recording_flags[cam_id] or motion
-
-            if should_record:
-                with recording_locks[cam_id]:
-                    if recording_writers[cam_id] is None:
+            if states[cam_id]["recording"]:
+                with states[cam_id]["lock"]:
+                    if states[cam_id]["writer"] is None:
                         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
                         filename = f"{cam_id}_{timestamp}.mp4"
-                        path = Path("static/videos") / filename
-                        path.parent.mkdir(exist_ok=True)
+                        out_path = Path("static/videos") / filename
+                        out_path.parent.mkdir(exist_ok=True)
                         h, w = frame.shape[:2]
-                        writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
-                        recording_writers[cam_id] = writer
-                    recording_writers[cam_id].write(frame)
-
-            elif recording_writers[cam_id] is not None:
-                with recording_locks[cam_id]:
-                    recording_writers[cam_id].release()
-                    recording_writers[cam_id] = None
+                        writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
+                        states[cam_id]["writer"] = writer
+                    states[cam_id]["writer"].write(frame)
+            else:
+                if states[cam_id]["writer"] is not None:
+                    with states[cam_id]["lock"]:
+                        states[cam_id]["writer"].release()
+                        states[cam_id]["writer"] = None
 
             _, jpeg = cv2.imencode('.jpg', frame)
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
@@ -95,19 +125,23 @@ def stream_img(cam_id):
 
 @streaming_blueprint.route('/start_recording/<cam_id>', methods=['POST'])
 def start_recording(cam_id):
-    recording_flags[cam_id] = True
+    init_state(cam_id)
+    states[cam_id]["recording"] = True
     return '', 204
 
 @streaming_blueprint.route('/stop_recording/<cam_id>', methods=['POST'])
 def stop_recording(cam_id):
-    recording_flags[cam_id] = False
+    init_state(cam_id)
+    states[cam_id]["recording"] = False
     return '', 204
+
+@streaming_blueprint.route('/toggle_landmarks/<cam_id>', methods=['POST'])
+def toggle_landmarks(cam_id):
+    init_state(cam_id)
+    states[cam_id]["landmarks"] = not states[cam_id]["landmarks"]
+    return jsonify({"landmarks_enabled": states[cam_id]["landmarks"]})
 
 @streaming_blueprint.route('/recording_status/<cam_id>')
 def recording_status(cam_id):
-    return jsonify({'recording': recording_flags.get(cam_id, False)})
-
-@streaming_blueprint.route('/toggle_motion/<cam_id>', methods=['POST'])
-def toggle_motion(cam_id):
-    motion_detection_flags[cam_id] = not motion_detection_flags.get(cam_id, False)
-    return jsonify({'motion_enabled': motion_detection_flags[cam_id]})
+    init_state(cam_id)
+    return jsonify({'recording': states[cam_id]["recording"]})
