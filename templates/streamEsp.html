@@ -56,6 +56,28 @@
     <div class="camera-container">
         <h1>Stream von {{ cam_id }}</h1>
         <img id="streamEsp" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="Camera Stream">
+        <div class="slider-container">
+            <label for="ledSlider">LED Helligkeit:</label>
+            <input type="range" id="ledSlider" name="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
+            <span id="ledValue">0</span>
+        </div>
     </div>
 </div>
 {% endblock %}
+<script>
+    const esp32_ip = "{{ cameras[cam_id]['ip'] }}";
+
+    function updateLed(val) {
+        document.getElementById("ledValue").textContent = val;
+        fetch(`http://${esp32_ip}/control?var=led_intensity&val=${val}`)
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Fehler beim Senden an ESP32');
+                }
+            })
+            .catch(error => {
+                console.error('Verbindungsfehler:', error);
+            });
+    }
+</script>
+
