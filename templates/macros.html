@@ -1,0 +1,18 @@
+{% macro render_device(device_id, device) %}
+    <div class="device">
+        <h3>{{ device_id }}</h3>
+        <p>IP Address: {{ device.ip }}</p>
+
+        {% if 'Led' in device.elements %}
+            <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
+            <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
+            <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
+                LED Status: {{ device.status | capitalize }}
+            </p>
+        {% endif %}
+
+        <div class="connected-elements">
+            Connected Elements: {{ device.elements | join(', ') }}
+        </div>
+    </div>
+{% endmacro %}

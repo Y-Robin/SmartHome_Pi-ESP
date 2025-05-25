@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 
+{% import "macros.html" as macros %}
+
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
 <style>
+    h2 {
+        text-align: center;
+        margin-top: 40px;
+        color: #333;
+    }
+
     .device-container {
         display: flex;
         justify-content: space-around;
@@ -63,54 +71,21 @@
 <h2>ESP Devices</h2>
 <div class="device-container">
 {% for device_id, device in devices.items() %}
-    <div class="device">
-        <h3>{{ device_id }}</h3>
-        <p>IP Address: {{ device.ip }}</p>
-        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
-        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
-        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
-            LED Status: {{ device.status | capitalize }}
-        </p>
-        <div class="connected-elements">
-            Connected Elements: {{ device.elements | join(', ') }}
-        </div>
-    </div>
+    {{ macros.render_device(device_id, device) }}
 {% endfor %}
 </div>
 
 <h2>Camera Devices</h2>
 <div class="device-container">
 {% for device_id, device in cameras.items() %}
-    <div class="device">
-        <h3>{{ device_id }}</h3>
-        <p>IP Address: {{ device.ip }}</p>
-        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
-        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
-        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
-            LED Status: {{ device.status | capitalize }}
-        </p>
-        <div class="connected-elements">
-            Connected Elements: {{ device.elements | join(', ') }}
-        </div>
-    </div>
+    {{ macros.render_device(device_id, device) }}
 {% endfor %}
 </div>
 
 <h2>Robot Devices</h2>
 <div class="device-container">
 {% for device_id, device in robots.items() %}
-    <div class="device">
-        <h3>{{ device_id }}</h3>
-        <p>IP Address: {{ device.ip }}</p>
-        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
-        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
-        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
-            LED Status: {{ device.status | capitalize }}
-        </p>
-        <div class="connected-elements">
-            Connected Elements: {{ device.elements | join(', ') }}
-        </div>
-    </div>
+    {{ macros.render_device(device_id, device) }}
 {% endfor %}
 </div>
 {% endblock %}
@@ -136,20 +111,4 @@
         xhr.send('command=' + command);
     }
 </script>
-{% endblock %}
-
-{% block styles %}
-<style>
-    .device-container {
-        display: flex;
-        justify-content: space-around;
-        flex-wrap: wrap;
-    }
-    .device {
-        border: 1px solid #ddd;
-        padding: 15px;
-        margin: 10px;
-        text-align: center;
-    }
-</style>
 {% endblock %}
