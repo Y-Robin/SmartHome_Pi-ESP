@@ -29,7 +29,7 @@ def default_stream():
 
 @streaming_blueprint.route('/streamEsp/<cam_id>')
 def streamEsp(cam_id):
-    return render_template('streamESP.html', cam_id=cam_id, cameras=camera_devices)
+    return render_template('streamEsp.html', cam_id=cam_id, cameras=camera_devices)
 
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
