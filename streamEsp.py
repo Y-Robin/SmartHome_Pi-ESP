@@ -11,7 +11,6 @@ import subprocess
 
 streaming_blueprint = Blueprint('streaming', __name__, template_folder='templates')
 
-# === MoveNet Setup ===
 TFLITE_MODEL_PATH = "movenet_singlepose_lightning.tflite"
 INPUT_SIZE = 192
 KEYPOINT_SCORE_THRES = 0.3
@@ -27,7 +26,7 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# === Konfiguration laden ===
+
 def load_config():
     with open(Path("config.yaml"), "r") as file:
         return yaml.safe_load(file)
@@ -35,15 +34,22 @@ def load_config():
 config = load_config()
 camera_devices = config.get("camera_devices", {})
 states = {}
+shared_frames = {}
+
 
 def init_state(cam_id):
     if cam_id not in states:
         states[cam_id] = {
             "recording": False,
             "landmarks": False,
-            "writer": None,
             "lock": threading.Lock()
         }
+    if cam_id not in shared_frames:
+        shared_frames[cam_id] = {
+            "frame": None,
+            "lock": threading.Lock()
+        }
+
 
 def detect_landmarks(rgb_img):
     img_resized = cv2.resize(rgb_img, (INPUT_SIZE, INPUT_SIZE))
@@ -51,6 +57,7 @@ def detect_landmarks(rgb_img):
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
     return interpreter.get_tensor(output_details[0]['index'])[0, 0]
+
 
 def draw_landmarks(frame_bgr, keypoints):
     h, w, _ = frame_bgr.shape
@@ -65,14 +72,45 @@ def draw_landmarks(frame_bgr, keypoints):
         if points[i][2] > KEYPOINT_SCORE_THRES and points[j][2] > KEYPOINT_SCORE_THRES:
             cv2.line(frame_bgr, points[i][:2], points[j][:2], (0, 255, 255), 1)
 
+
+def start_stream_thread(cam_id, source_type, cam_ip, port):
+    def capture_loop():
+        if source_type == "robot":
+            snapshot_url = f"http://{cam_ip}/snapshot"
+            while True:
+                cap = cv2.VideoCapture(snapshot_url)
+                ret, frame = cap.read()
+                cap.release()
+                if ret:
+                    with shared_frames[cam_id]["lock"]:
+                        shared_frames[cam_id]["frame"] = frame
+                time.sleep(0.2)
+        else:
+            stream_url = f"http://{cam_ip}:{port}/stream"
+            cap = cv2.VideoCapture(stream_url)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    with shared_frames[cam_id]["lock"]:
+                        shared_frames[cam_id]["frame"] = frame
+                else:
+                    time.sleep(0.1)
+            cap.release()
+
+    thread = threading.Thread(target=capture_loop, daemon=True)
+    thread.start()
+
+
 @streaming_blueprint.route('/streamEsp')
 def default_stream():
     first_cam_id = next(iter(camera_devices))
     return redirect(url_for('streaming.streamEsp', cam_id=first_cam_id))
 
+
 @streaming_blueprint.route('/streamEsp/<cam_id>')
 def streamEsp(cam_id):
     return render_template('streamEsp.html', cam_id=cam_id, cameras=camera_devices)
+
 
 @streaming_blueprint.route('/streamEspImg/<cam_id>')
 def stream_img(cam_id):
@@ -80,39 +118,23 @@ def stream_img(cam_id):
     cam_config = camera_devices[cam_id]
     cam_ip = cam_config['ip']
     source_type = cam_config.get("source", "esp")
+    port = cam_config.get("port", 81)
 
-    recording_active = False
-    frame_buffer = []
-    max_frames = 2000
-    filename = None
-
-    def get_robot_snapshot():
-        snapshot_url = f"http://{cam_ip}/snapshot"
-        cap = cv2.VideoCapture(snapshot_url)
-        ret, frame = cap.read()
-        cap.release()
-        return ret, frame
+    if shared_frames[cam_id]["frame"] is None:
+        start_stream_thread(cam_id, source_type, cam_ip, port)
 
     def generate():
-        nonlocal recording_active, frame_buffer, filename
-
-        cap = None
-        if source_type != "robot":
-            stream_url = f"http://{cam_ip}:{cam_config.get('port', 81)}/stream"
-            cap = cv2.VideoCapture(stream_url)
-            if not cap.isOpened():
-                print(f"[ERROR] Kamera {cam_id} nicht erreichbar: {stream_url}")
-                yield b''
-                return
+        recording_active = False
+        frame_buffer = []
+        max_frames = 2000
+        filename = None
 
         while True:
-            if source_type == "robot":
-                ret, frame = get_robot_snapshot()
-                time.sleep(0.2)
-            else:
-                ret, frame = cap.read()
+            with shared_frames[cam_id]["lock"]:
+                frame = shared_frames[cam_id]["frame"].copy() if shared_frames[cam_id]["frame"] is not None else None
 
-            if not ret or frame is None or frame.size == 0:
+            if frame is None:
+                time.sleep(0.05)
                 continue
 
             if states[cam_id]["landmarks"]:
@@ -151,10 +173,6 @@ def stream_img(cam_id):
                             "-y", str(mp4_path)
                         ], capture_output=True, text=True)
 
-                        with open("/tmp/ffmpeg_log.txt", "w") as log_file:
-                            log_file.write("STDOUT:\n" + result.stdout)
-                            log_file.write("\nSTDERR:\n" + result.stderr)
-
                         if result.returncode == 0:
                             avi_path.unlink()
                     except Exception as e:
@@ -168,10 +186,8 @@ def stream_img(cam_id):
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
             time.sleep(0.05)
 
-        if cap:
-            cap.release()
-
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 
 @streaming_blueprint.route('/start_recording/<cam_id>', methods=['POST'])
 def start_recording(cam_id):
@@ -179,17 +195,20 @@ def start_recording(cam_id):
     states[cam_id]["recording"] = True
     return '', 204
 
+
 @streaming_blueprint.route('/stop_recording/<cam_id>', methods=['POST'])
 def stop_recording(cam_id):
     init_state(cam_id)
     states[cam_id]["recording"] = False
     return '', 204
 
+
 @streaming_blueprint.route('/toggle_landmarks/<cam_id>', methods=['POST'])
 def toggle_landmarks(cam_id):
     init_state(cam_id)
     states[cam_id]["landmarks"] = not states[cam_id]["landmarks"]
     return jsonify({"landmarks_enabled": states[cam_id]["landmarks"]})
+
 
 @streaming_blueprint.route('/recording_status/<cam_id>')
 def recording_status(cam_id):
