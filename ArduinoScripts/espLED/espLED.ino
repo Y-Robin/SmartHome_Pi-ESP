@@ -1,158 +1,175 @@
 #include <ESP8266WiFi.h>
-
 #include <ESP8266WebServer.h>
-
 #include <ESP8266HTTPClient.h>
-
 #include <DHT.h>
-
+#include <AccelStepper.h>
+extern "C" {
+  #include "user_interface.h"
+}
 #include "config.h"
 
-// Set the GPIO pin where you have connected your LED or relay
+
 
 const int ledPin = D1;
-
-#define DHTPIN D2  // Change to the pin you connected DHT
-
+#define DHTPIN D2
 #define DHTTYPE DHT11
-
-
-
 DHT dht(DHTPIN, DHTTYPE);
 
+ESP8266WebServer server(80);
 
+// --- Sensor & Timing ---
+float temperature = NAN;
+float humidity = NAN;
+bool sensorReady = false;
 
-
-ESP8266WebServer server(80);  // Create a web server on port 80
-
+unsigned long lastReadTime = 0;
+unsigned long lastRetryTime = 0;
+unsigned long lastMemLog = 0;
+const unsigned long readInterval = 100000;     // 100 s bei gültigem Sensor
+const unsigned long retryInterval = 5000;      // 5 s bei Sensorfehler
+const unsigned long memLogInterval = 60000;    // 1 Min Heap-Log
+const unsigned long rebootThreshold = 3000;    // min. 3 KB Heap vor Reboot
 
 
 void setup() {
-
   Serial.begin(115200);
-
-  
-
-  // Initialize the LED pin as an output
+  Serial.println("\nBooting...");
 
   pinMode(ledPin, OUTPUT);
+  dht.begin();
 
-  dht.begin(); 
 
-  // Connect to WiFi
-
+  // WiFi verbinden (Initial)
   WiFi.begin(ssid, password);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
 
   while (WiFi.status() != WL_CONNECTED) {
-
     delay(500);
-
     Serial.print(".");
-
   }
-
-  Serial.println("");
-
-  Serial.print("Connected to WiFi. IP address: ");
-
+  Serial.println();
+  Serial.print("WiFi connected. IP: ");
   Serial.println(WiFi.localIP());
 
-
-
-  // Define web server routes
-
-  server.on("/", handleRoot);      // Call the 'handleRoot' function when a client requests URI "/"
-
-  server.on("/on", handleLedOn);   // Call 'handleLedOn' when a client requests URI "/on"
-
-  server.on("/off", handleLedOff); // Call 'handleLedOff' when a client requests URI "/off"
-
-
-
-  server.begin(); // Start the server
-
+  // Webserver-Routen
+  server.on("/", handleRoot);
+  server.on("/on", handleLedOn);
+  server.on("/off", handleLedOff);
+  server.begin();
 }
-
-
 
 void loop() {
+  unsigned long now = millis();
 
-  server.handleClient(); // Handle client requests
-
-  float humidity = dht.readHumidity();
-
-  float temperature = dht.readTemperature();
+  checkWiFiReconnect();
+  server.handleClient();
 
 
-
-  if (isnan(humidity) || isnan(temperature)) {
-
-    Serial.println("Failed to read from DHT sensor!");
-
-    return;
-
+  if (!sensorReady && now - lastRetryTime >= retryInterval) {
+    lastRetryTime = now;
+    tryReadSensor();
   }
 
-  //Serial.println(humidity);
+  if (sensorReady && now - lastReadTime >= readInterval) {
+    lastReadTime = now;
+    tryReadSensor();
+  }
 
-  // Send temperature data to Flask server every 10 seconds
-
-  static unsigned long lastTime = 0;
-
-  if (millis() - lastTime > 10000) {
-
-    lastTime = millis();
-
-    if (WiFi.status() == WL_CONNECTED) {
-
-      WiFiClient client;
-
-      HTTPClient http;
-
-      http.begin(client, serverUrl);
-
-      
-
-      http.addHeader("Content-Type", "application/json");
-
-      String payload = "{\"device_id\": \"ESP_02\", \"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + "}";
-
-      http.POST(payload);
-
-      http.end();
-
-      Serial.println(payload);
-
+  // RAM loggen
+  if (now - lastMemLog > memLogInterval) {
+    lastMemLog = now;
+    unsigned long heap = system_get_free_heap_size();
+    Serial.printf("Free heap: %lu bytes\n", heap);
+    if (heap < rebootThreshold) {
+      Serial.println("Heap critically low. Restarting...");
+      delay(500);
+      ESP.restart();
     }
+  }
+}
 
+// --- WLAN-Reconnect ---
+void checkWiFiReconnect() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi lost. Attempting reconnect...");
+    WiFi.disconnect();
+    delay(100);
+    WiFi.begin(ssid, password);
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 5000) {
+      delay(100);
+      yield();
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("WiFi reconnected.");
+    } else {
+      Serial.println("Reconnect failed.");
+    }
+  }
+}
+
+// --- Sensor lesen ---
+void tryReadSensor() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (!isnan(h) && !isnan(t)) {
+    humidity = h;
+    temperature = t;
+    sensorReady = true;
+    Serial.printf("Sensor OK: %.1f°C, %.1f%%\n", temperature, humidity);
+    sendData();
+  } else {
+    sensorReady = false;
+    Serial.println("DHT read failed.");
+  }
+  yield();  // Watchdog
+}
+
+// --- HTTP senden ---
+void sendData() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected. Skipping POST.");
+    return;
   }
 
+  WiFiClient client;
+  HTTPClient http;
+  if (!http.begin(client, serverUrl)) {
+    Serial.println("HTTP begin failed.");
+    return;
+  }
+
+  http.setTimeout(2000);
+  http.addHeader("Content-Type", "application/json");
+
+  char payload[128];
+  snprintf(payload, sizeof(payload),
+           "{\"device_id\":\"ESP_02\",\"temperature\":%.1f,\"humidity\":%.1f}",
+           temperature, humidity);
+
+  int code = http.POST(payload);
+  http.end();
+
+  Serial.printf("HTTP POST [%d] → %s\n", code, payload);
 }
 
 
 
+// --- Webserver Handler ---
 void handleRoot() {
-
-  server.send(200, "text/plain", "ESP8266 LED Control");
-
+  server.send(200, "text/plain", "ESP8266 Status OK");
 }
-
-
 
 void handleLedOn() {
-
-  digitalWrite(ledPin, HIGH);  // Turn the LED on
-
+  digitalWrite(ledPin, HIGH);
   server.send(200, "text/plain", "LED is ON");
-
 }
-
-
 
 void handleLedOff() {
-
-  digitalWrite(ledPin, LOW);   // Turn the LED off
-
+  digitalWrite(ledPin, LOW);
   server.send(200, "text/plain", "LED is OFF");
-
 }
+
+

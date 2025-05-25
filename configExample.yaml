@@ -1,0 +1,25 @@
+devices:
+  ESP_01:
+    ip: xxx.xxx.xxx.xx
+    elements: [Led, Temperature, Stepper]
+  ESP_02:
+    ip: xxx.xxx.xxx.xx
+    elements: [Temperature, Led]
+  ESP_03:
+    ip: xxx.xxx.xxx.xx
+    elements: [Led, Temperature]
+
+stepper_devices:
+  ESP_01:
+    ip: xxx.xxx.xxx.xx
+    elements: [Led, Temperature, Stepper]
+
+camera_devices:
+  ESP_CAM:
+    ip: xxx.xxx.xxx.xx
+    elements: [Camera]
+
+robot_devices:
+  ROBOT_01:
+    ip: xxx.xxx.xxx.xx
+    elements: [Drive, Snapshot, Command]

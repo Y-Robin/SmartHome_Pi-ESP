@@ -1,67 +1,65 @@
-from flask import Blueprint, render_template, Response
+from flask import Blueprint, render_template, Response, redirect, url_for
 import cv2
-import threading
 import time
 import yaml
 from pathlib import Path
 
+# === Konfiguration laden ===
 def load_config():
     with open(Path("config.yaml"), "r") as file:
         return yaml.safe_load(file)
 
 streaming_blueprint = Blueprint('streaming', __name__, template_folder='templates')
 
+# === Kamerakonfiguration aus YAML laden ===
 config = load_config()
 camera_devices = config.get("camera_devices", {})
 
 if not camera_devices:
-    raise ValueError("Keine Kamera in config.yaml unter 'camera_devices' gefunden.")
+    raise ValueError("Keine Kameras unter 'camera_devices' in config.yaml gefunden.")
 
-# Erste Kamera-IP extrahieren (oder erweitern auf mehrere bei Bedarf)
-cam_info = next(iter(camera_devices.values()))
-stream_url = f"http://{cam_info['ip']}:81/stream"
-esp32_ip = cam_info['ip']
-latest_frame = None
-lock = threading.Lock()
+# === Standard-Route: leitet auf erste verfügbare Kamera um ===
+@streaming_blueprint.route('/streamEsp')
+def default_stream():
+    if not camera_devices:
+        return "Keine Kameras verfügbar", 404
+    first_cam_id = next(iter(camera_devices))
+    return redirect(url_for('streaming.streamEsp', cam_id=first_cam_id))
 
-def capture_frames():
-    global latest_frame
-    while True:
+# === HTML-Ansicht für eine Kamera ===
+@streaming_blueprint.route('/streamEsp/<cam_id>')
+def streamEsp(cam_id):
+    if cam_id not in camera_devices:
+        return f"Kamera '{cam_id}' nicht gefunden.", 404
+    return render_template(
+        'streamEsp.html',
+        cam_id=cam_id,
+        cameras=camera_devices
+    )
+
+# === MJPEG-Stream für eine Kamera ===
+@streaming_blueprint.route('/streamEspImg/<cam_id>')
+def stream_img(cam_id):
+    if cam_id not in camera_devices:
+        return f"Kamera '{cam_id}' nicht in der Konfiguration.", 404
+
+    cam_ip = camera_devices[cam_id]['ip']
+    stream_url = f"http://{cam_ip}:81/stream"
+
+    def generate():
         cap = cv2.VideoCapture(stream_url)
         if not cap.isOpened():
-            print("ESP32 nicht erreichbar – versuche erneut...")
-            time.sleep(5)
-            continue
+            yield b''
+            return
 
-        print("Verbunden mit ESP32.")
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("Frame fehlgeschlagen, Verbindung neu...")
-                cap.release()
                 break
-
             _, jpeg = cv2.imencode('.jpg', frame)
-            with lock:
-                latest_frame = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
             time.sleep(0.05)
+        cap.release()
 
-# Starte Thread beim Import
-capture_thread = threading.Thread(target=capture_frames, daemon=True)
-capture_thread.start()
-
-@streaming_blueprint.route('/streamEsp')
-def streamEsp():
-    return render_template('streamEsp.html', esp32_ip=esp32_ip)
-
-@streaming_blueprint.route('/streamEspImg')
-def stream():
-    def generate():
-        while True:
-            with lock:
-                frame = latest_frame
-            if frame:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-            time.sleep(0.05)
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
