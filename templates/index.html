@@ -26,7 +26,7 @@
     }
 
     .device h3 {
-        color: #007bff; /* Blue */
+        color: #007bff;
     }
 
     .device p {
@@ -63,21 +63,54 @@
 <h2>ESP Devices</h2>
 <div class="device-container">
 {% for device_id, device in devices.items() %}
-    {{ render_device(device_id, device) }}
+    <div class="device">
+        <h3>{{ device_id }}</h3>
+        <p>IP Address: {{ device.ip }}</p>
+        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
+        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
+        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
+            LED Status: {{ device.status | capitalize }}
+        </p>
+        <div class="connected-elements">
+            Connected Elements: {{ device.elements | join(', ') }}
+        </div>
+    </div>
 {% endfor %}
 </div>
 
 <h2>Camera Devices</h2>
 <div class="device-container">
 {% for device_id, device in cameras.items() %}
-    {{ render_device(device_id, device) }}
+    <div class="device">
+        <h3>{{ device_id }}</h3>
+        <p>IP Address: {{ device.ip }}</p>
+        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
+        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
+        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
+            LED Status: {{ device.status | capitalize }}
+        </p>
+        <div class="connected-elements">
+            Connected Elements: {{ device.elements | join(', ') }}
+        </div>
+    </div>
 {% endfor %}
 </div>
 
 <h2>Robot Devices</h2>
 <div class="device-container">
 {% for device_id, device in robots.items() %}
-    {{ render_device(device_id, device) }}
+    <div class="device">
+        <h3>{{ device_id }}</h3>
+        <p>IP Address: {{ device.ip }}</p>
+        <button onclick="sendCommand('{{ device_id }}', 'on')">Turn On</button>
+        <button onclick="sendCommand('{{ device_id }}', 'off')">Turn Off</button>
+        <p id="status-{{ device_id }}" class="{{ 'status-' + device.status }}">
+            LED Status: {{ device.status | capitalize }}
+        </p>
+        <div class="connected-elements">
+            Connected Elements: {{ device.elements | join(', ') }}
+        </div>
+    </div>
 {% endfor %}
 </div>
 {% endblock %}
@@ -91,7 +124,7 @@
             var statusElement = document.getElementById('status-' + data.device_id);
             if (statusElement) {
                 statusElement.innerText = 'LED Status: ' + data.status.toUpperCase();
-                statusElement.className = 'status-' + data.status; // Dynamically update the class based on status
+                statusElement.className = 'status-' + data.status;
             }
         });
     });
