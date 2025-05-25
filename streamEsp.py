@@ -7,6 +7,7 @@ from pathlib import Path
 import threading
 import numpy as np
 import tflite_runtime.interpreter as tflite
+import subprocess
 
 streaming_blueprint = Blueprint('streaming', __name__, template_folder='templates')
 
@@ -129,6 +130,23 @@ def stream_img(cam_id):
                                 writer.write(f)
                             writer.release()
                             print(f"[OK] Video gespeichert: {out_path}")
+                            # === Nachbearbeitung für Browserkompatibilität ===
+                            fixed_path = out_path.with_name("fixed_" + out_path.name)
+
+                            try:
+                                subprocess.run([
+                                    "ffmpeg", "-i", str(out_path),
+                                    "-movflags", "+faststart",
+                                    "-y",  # überschreibe automatisch
+                                    str(fixed_path)
+                                ], check=True)
+
+                                out_path.unlink()  # Original löschen
+                                fixed_path.rename(out_path)  # Umbenennen zurück zum Originalnamen
+                                print(f"[OK] Video optimiert für Web: {out_path.name}")
+
+                            except Exception as e:
+                                print(f"[ERROR] ffmpeg fehlgeschlagen: {e}")
                         except Exception as e:
                             print(f"[ERROR] Fehler beim Speichern: {e}")
                     frame_buffer = []
