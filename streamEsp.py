@@ -85,7 +85,7 @@ def stream_img(cam_id):
     # Aufnahme-Kontext
     recording_active = False
     frame_buffer = []
-    max_frames = 2000  # optionaler Grenzwert
+    max_frames = 2000
     filename = None
 
     def generate():
@@ -102,12 +102,13 @@ def stream_img(cam_id):
             if not ret or frame is None or frame.size == 0:
                 continue  # Frame überspringen
 
+            # Pose-Detection (optional)
             if states[cam_id]["landmarks"]:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 keypoints = detect_landmarks(rgb)
                 draw_landmarks(frame, keypoints)
 
-            # === Aufnahmeverarbeitung ===
+            # === Aufnahme starten ===
             if states[cam_id]["recording"]:
                 if not recording_active:
                     print(f"[INFO] Starte Aufnahme für {cam_id}")
@@ -116,44 +117,49 @@ def stream_img(cam_id):
                     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
                     filename = f"{cam_id}_{timestamp}.mp4"
                 frame_buffer.append(frame.copy())
-            else:
-                if recording_active:
-                    print(f"[INFO] Stoppe Aufnahme für {cam_id}")
-                    recording_active = False
-                    if frame_buffer:
-                        out_path = Path("static/videos") / filename
-                        out_path.parent.mkdir(parents=True, exist_ok=True)
-                        h, w = frame.shape[:2]
-                        try:
-                            writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
-                            for f in frame_buffer[:max_frames]:
-                                writer.write(f)
-                            writer.release()
-                            print(f"[OK] Video gespeichert: {out_path}")
-                            # === Nachbearbeitung für Browserkompatibilität ===
-                            fixed_path = out_path.with_name("fixed_" + out_path.name)
 
-                            try:
-                                subprocess.run([
-                                    "ffmpeg", "-i", str(out_path),
-                                    "-movflags", "+faststart",
-                                    "-y",  # überschreibe automatisch
-                                    str(fixed_path)
-                                ], check=True)
+            # === Aufnahme stoppen und speichern ===
+            elif recording_active:
+                print(f"[INFO] Stoppe Aufnahme für {cam_id}")
+                recording_active = False
+                if frame_buffer:
+                    out_path = Path("static/videos") / filename
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    h, w = frame.shape[:2]
 
-                                out_path.unlink()  # Original löschen
-                                fixed_path.rename(out_path)  # Umbenennen zurück zum Originalnamen
-                                print(f"[OK] Video optimiert für Web: {out_path.name}")
+                    try:
+                        # Datei schreiben
+                        writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*'mp4v'), 20, (w, h))
+                        for f in frame_buffer[:max_frames]:
+                            writer.write(f)
+                        writer.release()
+                        print(f"[OK] Video gespeichert: {out_path}")
 
-                            except Exception as e:
-                                print(f"[ERROR] ffmpeg fehlgeschlagen: {e}")
-                        except Exception as e:
-                            print(f"[ERROR] Fehler beim Speichern: {e}")
-                    frame_buffer = []
+                        # === ffmpeg: optimieren für Browser ===
+                        fixed_path = out_path.with_name("fixed_" + out_path.name)
+                        result = subprocess.run([
+                            "ffmpeg", "-i", str(out_path),
+                            "-movflags", "+faststart",
+                            "-c", "copy",
+                            "-y",
+                            str(fixed_path)
+                        ], capture_output=True, text=True)
+
+                        if result.returncode != 0:
+                            print(f"[FFMPEG ERROR] {result.stderr}")
+                        else:
+                            out_path.unlink()
+                            fixed_path.rename(out_path)
+                            print(f"[OK] Web-optimiertes Video: {out_path.name}")
+
+                    except Exception as e:
+                        print(f"[ERROR] Fehler beim Speichern oder Konvertieren: {e}")
+
+                frame_buffer = []
 
             # === MJPEG-Ausgabe ===
-            _, jpeg = cv2.imencode('.jpg', frame)
-            if not _:
+            success, jpeg = cv2.imencode('.jpg', frame)
+            if not success:
                 continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
             time.sleep(0.05)
