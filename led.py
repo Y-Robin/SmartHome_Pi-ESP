@@ -10,23 +10,23 @@ def create_led_blueprint(socketio):
 
     CONFIG_PATH = Path("config.yaml")
 
-    def init_devices(section):
-        return {
-            device_id: {**info, "status": "unknown"}
-            for device_id, info in config.get(section, {}).items()
-        }
+    with open(CONFIG_PATH, 'r') as file:
+        config = yaml.safe_load(file)
 
-    esp_devices = init_devices('devices')
-    camera_devices = init_devices('camera_devices')
-    robot_devices = init_devices('robot_devices')
+        def init_devices(section):
+            return {
+                device_id: {**info, "status": "unknown"}
+                for device_id, info in config.get(section, {}).items()
+            }
+
+        esp_devices = init_devices('devices')
+        camera_devices = init_devices('camera_devices')
+        robot_devices = init_devices('robot_devices')
 
 
     @led_blueprint.route('/')
     def index():
-        return render_template('index.html',
-                       devices=esp_devices,
-                       cameras=camera_devices,
-                       robots=robot_devices)
+        return render_template('index.html', devices=esp_devices)
 
 
     @led_blueprint.route('/control_led/<device_id>', methods=['POST'])
