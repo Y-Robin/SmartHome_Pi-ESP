@@ -3,123 +3,37 @@
 {% block title %}Roboter Steuerung{% endblock %}
 
 {% block content %}
-<h1>Roboter Steuerung</h1>
-
-<!-- Schnappschuss vom ESP32 (passt ggf. die IP-Adresse an!) -->
-<img id="snapshot" src="http://{{ robot_ip }}/snapshot" width="640" alt="Schnappschuss vom ESP32">
-
-<p>Bewege den Joystick, um Befehle an das Arduino-Fahrzeug zu senden.</p>
-
-<!-- Container für den Joystick -->
-<div id="joystick-container">
-    <div id="joystick-handle"></div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // IP-Adresse des ESP32 anpassen, falls erforderlich!
-    const ESP32_IP = "{{ robot_ip }}";
-
-    // Aktualisiert den Schnappschuss alle 200ms
-    setInterval(() => {
-      const snapshotEl = document.getElementById("snapshot");
-      snapshotEl.src = `http://${ESP32_IP}/snapshot?time=${Date.now()}`;
-    }, 200);
-
-    // Funktion zum Senden von Befehlen an den ESP32
-    function sendCommand(cmd) {
-      fetch(`http://${ESP32_IP}/command?cmd=${cmd}`)
-        .then(response => response.text())
-        .then(data => {
-          console.log("Antwort vom ESP32:", data);
-        })
-        .catch(err => console.error("Fehler beim Senden des Befehls:", err));
-    }
-
-    // Joystick-Logik
-    const joystickContainer = document.getElementById("joystick-container");
-    const joystickHandle = document.getElementById("joystick-handle");
-
-    const containerSize = 200; // Durchmesser des Joystick-Bereichs
-    const handleSize = 50;     // Durchmesser des Joystick-Griffs
-    const center = containerSize / 2;
-
-    let pointerActive = false;
-    let currentCommand = "stop_it";
-
-    joystickContainer.addEventListener("pointerdown", e => {
-      pointerActive = true;
-      joystickContainer.setPointerCapture(e.pointerId);
-      updateJoystick(e);
-    });
-
-    joystickContainer.addEventListener("pointermove", e => {
-      if (!pointerActive) return;
-      updateJoystick(e);
-    });
-
-    joystickContainer.addEventListener("pointerup", e => {
-      pointerActive = false;
-      joystickContainer.releasePointerCapture(e.pointerId);
-      // Joystick-Griff in die Mitte zurücksetzen
-      joystickHandle.style.left = `${center - handleSize/2}px`;
-      joystickHandle.style.top = `${center - handleSize/2}px`;
-      if (currentCommand !== "stop_it") {
-        currentCommand = "stop_it";
-        sendCommand("stop_it");
-      }
-    });
-
-    function updateJoystick(e) {
-      const rect = joystickContainer.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
-      const dx = offsetX - center;
-      const dy = offsetY - center;
-      const maxRadius = (containerSize - handleSize) / 2;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      let clampedX = dx;
-      let clampedY = dy;
-      if (distance > maxRadius) {
-        const angle = Math.atan2(dy, dx);
-        clampedX = Math.cos(angle) * maxRadius;
-        clampedY = Math.sin(angle) * maxRadius;
-      }
-      joystickHandle.style.left = `${center + clampedX - handleSize/2}px`;
-      joystickHandle.style.top = `${center + clampedY - handleSize/2}px`;
-      
-      const dir = getDirectionFromOffset(clampedX, clampedY);
-      if (dir !== currentCommand) {
-        currentCommand = dir;
-        sendCommand(dir);
-      }
-    }
-
-    function getDirectionFromOffset(x, y) {
-      const threshold = 20; 
-      const absX = Math.abs(x);
-      const absY = Math.abs(y);
-      if (absX < threshold && absY < threshold) {
-        return "stop_it";
-      }
-      if (absX < threshold && y < -threshold) return "Forward";
-      if (absX < threshold && y > threshold) return "Backward";
-      if (absY < threshold && x < -threshold) return "Left";
-      if (absY < threshold && x > threshold) return "Right";
-      if (x < -threshold && y < -threshold) return "LeftForward";
-      if (x < -threshold && y > threshold) return "LeftBackward";
-      if (x > threshold && y < -threshold) return "RightForward";
-      if (x > threshold && y > threshold) return "RightBackward";
-      return "stop_it";
-    }
-</script>
-
 <style>
-    body {
-      font-family: sans-serif;
+    .page-container {
+        display: flex;
     }
-    /* Container für den Joystick */
+
+    .sidebar {
+        width: 200px;
+        padding: 20px;
+        border-right: 1px solid #ccc;
+    }
+
+    .sidebar ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .sidebar li {
+        margin-bottom: 10px;
+    }
+
+    .sidebar a {
+        text-decoration: none;
+        color: #007bff;
+        font-weight: bold;
+    }
+
+    .robot-control {
+        flex-grow: 1;
+        padding: 20px;
+    }
+
     #joystick-container {
       position: relative;
       width: 200px;
@@ -127,9 +41,9 @@
       background-color: #ccc;
       border-radius: 50%;
       margin: 20px 0;
-      touch-action: none; /* Wichtig für Touch-Geräte */
+      touch-action: none;
     }
-    /* Joystick-Griff */
+
     #joystick-handle {
       position: absolute;
       width: 50px;
@@ -141,4 +55,116 @@
       pointer-events: none;
     }
 </style>
+
+<div class="page-container">
+    <div class="sidebar">
+        <h3>Roboter</h3>
+        <ul>
+            {% for name, dev in devices.items() %}
+                <li><a href="{{ url_for('robot.robot_control', device_id=name) }}">{{ name }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="robot-control">
+        <h1>Roboter: {{ device_id }}</h1>
+        <img id="snapshot" src="http://{{ robot_ip }}/snapshot" width="640" alt="Snapshot vom Roboter">
+        <p>Bewege den Joystick, um Fahrbefehle zu senden.</p>
+        <div id="joystick-container">
+            <div id="joystick-handle"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const ESP32_IP = "{{ robot_ip }}";
+
+    setInterval(() => {
+        const snapshotEl = document.getElementById("snapshot");
+        snapshotEl.src = `http://${ESP32_IP}/snapshot?time=${Date.now()}`;
+    }, 200);
+
+    function sendCommand(cmd) {
+        fetch(`http://${ESP32_IP}/command?cmd=${cmd}`)
+            .then(response => response.text())
+            .then(data => {
+                console.log("Antwort vom Roboter:", data);
+            })
+            .catch(err => console.error("Fehler beim Senden des Befehls:", err));
+    }
+
+    const joystickContainer = document.getElementById("joystick-container");
+    const joystickHandle = document.getElementById("joystick-handle");
+
+    const containerSize = 200;
+    const handleSize = 50;
+    const center = containerSize / 2;
+    let pointerActive = false;
+    let currentCommand = "stop_it";
+
+    joystickContainer.addEventListener("pointerdown", e => {
+        pointerActive = true;
+        joystickContainer.setPointerCapture(e.pointerId);
+        updateJoystick(e);
+    });
+
+    joystickContainer.addEventListener("pointermove", e => {
+        if (!pointerActive) return;
+        updateJoystick(e);
+    });
+
+    joystickContainer.addEventListener("pointerup", e => {
+        pointerActive = false;
+        joystickContainer.releasePointerCapture(e.pointerId);
+        joystickHandle.style.left = `${center - handleSize/2}px`;
+        joystickHandle.style.top = `${center - handleSize/2}px`;
+        if (currentCommand !== "stop_it") {
+            currentCommand = "stop_it";
+            sendCommand("stop_it");
+        }
+    });
+
+    function updateJoystick(e) {
+        const rect = joystickContainer.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        const dx = offsetX - center;
+        const dy = offsetY - center;
+        const maxRadius = (containerSize - handleSize) / 2;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        let clampedX = dx;
+        let clampedY = dy;
+        if (distance > maxRadius) {
+            const angle = Math.atan2(dy, dx);
+            clampedX = Math.cos(angle) * maxRadius;
+            clampedY = Math.sin(angle) * maxRadius;
+        }
+        joystickHandle.style.left = `${center + clampedX - handleSize/2}px`;
+        joystickHandle.style.top = `${center + clampedY - handleSize/2}px`;
+
+        const dir = getDirectionFromOffset(clampedX, clampedY);
+        if (dir !== currentCommand) {
+            currentCommand = dir;
+            sendCommand(dir);
+        }
+    }
+
+    function getDirectionFromOffset(x, y) {
+        const threshold = 20;
+        const absX = Math.abs(x);
+        const absY = Math.abs(y);
+        if (absX < threshold && absY < threshold) return "stop_it";
+        if (absX < threshold && y < -threshold) return "Forward";
+        if (absX < threshold && y > threshold) return "Backward";
+        if (absY < threshold && x < -threshold) return "Left";
+        if (absY < threshold && x > threshold) return "Right";
+        if (x < -threshold && y < -threshold) return "LeftForward";
+        if (x < -threshold && y > threshold) return "LeftBackward";
+        if (x > threshold && y < -threshold) return "RightForward";
+        if (x > threshold && y > threshold) return "RightBackward";
+        return "stop_it";
+    }
+</script>
 {% endblock %}

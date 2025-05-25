@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, redirect, url_for
 import yaml
 from pathlib import Path
 
@@ -9,13 +9,28 @@ def load_config():
 robot_blueprint = Blueprint('robot', __name__, template_folder='templates')
 
 @robot_blueprint.route('/robot')
-def robot_control():
+def default_robot():
     config = load_config()
-    robot_config = config.get("robot_devices", {})
-    
-    if not robot_config:
-        raise ValueError("Kein Roboter in config.yaml unter 'robot_devices' gefunden.")
+    robot_devices = config.get("robot_devices", {})
 
-    robot_ip = next(iter(robot_config.values()))['ip']
-    
-    return render_template('robot.html', robot_ip=robot_ip)
+    if not robot_devices:
+        return "Keine Robotergeräte in config.yaml gefunden.", 404
+
+    # Redirect auf erstes Gerät
+    first_robot = next(iter(robot_devices))
+    return redirect(url_for('robot.robot_control', device_id=first_robot))
+
+@robot_blueprint.route('/robot/<device_id>')
+def robot_control(device_id):
+    config = load_config()
+    robot_devices = config.get("robot_devices", {})
+
+    if device_id not in robot_devices:
+        return f"Robotergerät '{device_id}' nicht gefunden.", 404
+
+    return render_template(
+        'robot.html',
+        device_id=device_id,
+        devices=robot_devices,
+        robot_ip=robot_devices[device_id]['ip']
+    )
