@@ -1,25 +1,23 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
-#include <DHT.h>
-#include <AccelStepper.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 extern "C" {
   #include "user_interface.h"
 }
 #include "config.h"
 
-
-
+// --- Pins & Setup ---
 const int ledPin = D1;
-#define DHTPIN D2
-#define DHTTYPE DHT11
-DHT dht(DHTPIN, DHTTYPE);
+#define ONE_WIRE_BUS D3  // Sensor an D3 (GPIO0)
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 
 ESP8266WebServer server(80);
 
 // --- Sensor & Timing ---
 float temperature = NAN;
-float humidity = NAN;
 bool sensorReady = false;
 
 unsigned long lastReadTime = 0;
@@ -30,14 +28,12 @@ const unsigned long retryInterval = 5000;      // 5 s bei Sensorfehler
 const unsigned long memLogInterval = 60000;    // 1 Min Heap-Log
 const unsigned long rebootThreshold = 3000;    // min. 3 KB Heap vor Reboot
 
-
 void setup() {
   Serial.begin(115200);
   Serial.println("\nBooting...");
 
   pinMode(ledPin, OUTPUT);
-  dht.begin();
-
+  sensors.begin();
 
   // WiFi verbinden (Initial)
   WiFi.begin(ssid, password);
@@ -64,7 +60,6 @@ void loop() {
 
   checkWiFiReconnect();
   server.handleClient();
-
 
   if (!sensorReady && now - lastRetryTime >= retryInterval) {
     lastRetryTime = now;
@@ -111,18 +106,17 @@ void checkWiFiReconnect() {
 
 // --- Sensor lesen ---
 void tryReadSensor() {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+  sensors.requestTemperatures();
+  float t = sensors.getTempCByIndex(0);
 
-  if (!isnan(h) && !isnan(t)) {
-    humidity = h;
+  if (t != DEVICE_DISCONNECTED_C) {
     temperature = t;
     sensorReady = true;
-    Serial.printf("Sensor OK: %.1f°C, %.1f%%\n", temperature, humidity);
+    Serial.printf("Sensor OK: %.1f°C\n", temperature);
     sendData();
   } else {
     sensorReady = false;
-    Serial.println("DHT read failed.");
+    Serial.println("DS18B20 read failed.");
   }
   yield();  // Watchdog
 }
@@ -147,15 +141,13 @@ void sendData() {
   char payload[128];
   snprintf(payload, sizeof(payload),
            "{\"device_id\":\"ESP_02\",\"temperature\":%.1f,\"humidity\":%.1f}",
-           temperature, humidity);
+           temperature, 50.0);  // Dummy Humidity
 
   int code = http.POST(payload);
   http.end();
 
   Serial.printf("HTTP POST [%d] → %s\n", code, payload);
 }
-
-
 
 // --- Webserver Handler ---
 void handleRoot() {
@@ -171,5 +163,3 @@ void handleLedOff() {
   digitalWrite(ledPin, LOW);
   server.send(200, "text/plain", "LED is OFF");
 }
-
-
