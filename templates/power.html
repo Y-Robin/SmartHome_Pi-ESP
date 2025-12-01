@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Power Monitor{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Socket Power Monitor</h2>
+    <p>Live dashboard for voltage, current, power, and cumulative energy from the Shelly socket.</p>
+    <div class="controls">
+        <label for="timeRange">Time window:</label>
+        <select id="timeRange">
+            <option value="300">Last 5 minutes</option>
+            <option value="900">Last 15 minutes</option>
+            <option value="3600" selected>Last hour</option>
+            <option value="86400">Last 24 hours</option>
+        </select>
+        <label for="sampleLimit">Max samples:</label>
+        <input id="sampleLimit" type="number" value="1000" min="100" step="100">
+        <button id="refreshButton">Load data</button>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <h3>Voltage</h3>
+            <p id="voltageValue">–</p>
+        </div>
+        <div class="stat-card">
+            <h3>Current</h3>
+            <p id="currentValue">–</p>
+        </div>
+        <div class="stat-card">
+            <h3>Power</h3>
+            <p id="powerValue">–</p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Energy</h3>
+            <p id="energyValue">–</p>
+        </div>
+    </div>
+
+    <canvas id="powerChart" style="width:100%; max-height:420px;"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const socket = io();
+    const chartCtx = document.getElementById('powerChart').getContext('2d');
+    let powerChart;
+    let samples = [];
+
+    function buildChart() {
+        powerChart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Power (W)',
+                        data: [],
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.3)',
+                        yAxisID: 'power',
+                    },
+                    {
+                        label: 'Voltage (V)',
+                        data: [],
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.3)',
+                        yAxisID: 'voltage',
+                    },
+                    {
+                        label: 'Current (A)',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.25)',
+                        yAxisID: 'current',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'MMM D, YYYY, h:mm:ss a',
+                        },
+                    },
+                    power: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'Watts' },
+                    },
+                    voltage: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Volts' },
+                        grid: { drawOnChartArea: false },
+                    },
+                    current: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Amps' },
+                        grid: { drawOnChartArea: false },
+                        min: 0,
+                    },
+                },
+                plugins: {
+                    zoom: {
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'x',
+                        },
+                        pan: { enabled: true, mode: 'x' },
+                    },
+                },
+            },
+        });
+    }
+
+    function updateStats(latest) {
+        if (!latest) return;
+        document.getElementById('voltageValue').textContent = latest.voltage !== null ? `${latest.voltage.toFixed(1)} V` : '–';
+        document.getElementById('currentValue').textContent = latest.current !== null ? `${latest.current.toFixed(3)} A` : '–';
+        document.getElementById('powerValue').textContent = latest.power !== null ? `${latest.power.toFixed(1)} W` : '–';
+        document.getElementById('energyValue').textContent = latest.energy !== null ? `${latest.energy.toFixed(1)} Wh` : '–';
+    }
+
+    function trimSamples(durationSeconds, maxSamples) {
+        const cutoff = moment().subtract(durationSeconds, 'seconds');
+        samples = samples.filter(sample => moment(sample.timestamp).isAfter(cutoff)).slice(-maxSamples);
+    }
+
+    function renderChart() {
+        if (!powerChart) return;
+        powerChart.data.labels = samples.map(sample => sample.timestamp);
+        powerChart.data.datasets[0].data = samples.map(sample => sample.power);
+        powerChart.data.datasets[1].data = samples.map(sample => sample.voltage);
+        powerChart.data.datasets[2].data = samples.map(sample => sample.current);
+        powerChart.update();
+    }
+
+    function ingestSamples(newSamples) {
+        const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
+        const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
+        samples = samples.concat(newSamples);
+        trimSamples(durationSeconds, maxSamples);
+        renderChart();
+        updateStats(samples[samples.length - 1]);
+    }
+
+    async function fetchHistoricalData() {
+        const durationSeconds = document.getElementById('timeRange').value;
+        const maxSamples = document.getElementById('sampleLimit').value;
+        const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&limit=${maxSamples}`);
+        const data = await response.json();
+        ingestSamples(data);
+    }
+
+    document.getElementById('refreshButton').addEventListener('click', fetchHistoricalData);
+    document.getElementById('timeRange').addEventListener('change', fetchHistoricalData);
+    document.getElementById('sampleLimit').addEventListener('change', fetchHistoricalData);
+
+    socket.on('power_sample', sample => {
+        ingestSamples([sample]);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        buildChart();
+        fetchHistoricalData();
+    });
+</script>
+{% endblock %}
