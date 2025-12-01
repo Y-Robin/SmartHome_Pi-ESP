@@ -16,3 +16,20 @@
         </div>
     </div>
 {% endmacro %}
+
+{% macro render_socket(device_id, device) %}
+    <div class="device">
+        <h3>{{ device_id }}</h3>
+        <p>IP Address: {{ device.ip }}</p>
+
+        <button onclick="sendSocketCommand('{{ device_id }}', 'on')">Turn On</button>
+        <button onclick="sendSocketCommand('{{ device_id }}', 'off')">Turn Off</button>
+        <p id="socket-status-{{ device_id }}" class="{{ 'status-' + device.status }}">
+            Socket Status: {{ device.status | capitalize }}
+        </p>
+
+        <div class="connected-elements">
+            Connected Elements: {{ device.elements | join(', ') }}
+        </div>
+    </div>
+{% endmacro %}

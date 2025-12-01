@@ -23,3 +23,8 @@ robot_devices:
   ROBOT_01:
     ip: xxx.xxx.xxx.xx
     elements: [Drive, Snapshot, Command]
+
+socket_devices:
+  SOCKET_01:
+    ip: 192.168.178.xxx  # Example Shelly Plus Plug S V2
+    elements: [Socket]
