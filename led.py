@@ -60,9 +60,9 @@ def create_led_blueprint(socketio):
 
     def send_socket_command(device_id, command):
         try:
-            response = requests.get(
+            response = requests.post(
                 f"http://{socket_devices[device_id]['ip']}/rpc/Switch.Set",
-                params={"id": 0, "on": command == 'on'},
+                json={"id": 0, "on": command == 'on'},
                 timeout=2
             )
             if response.status_code == 200:
