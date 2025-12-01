@@ -22,6 +22,7 @@ def create_led_blueprint(socketio):
         esp_devices = init_devices('devices')
         camera_devices = init_devices('camera_devices')
         robot_devices = init_devices('robot_devices')
+        socket_devices = init_devices('socket_devices')
 
 
     @led_blueprint.route('/')
@@ -29,7 +30,8 @@ def create_led_blueprint(socketio):
         return render_template('index.html',
                        devices=esp_devices,
                        cameras=camera_devices,
-                       robots=robot_devices)
+                       robots=robot_devices,
+                       sockets=socket_devices)
 
 
     @led_blueprint.route('/control_led/<device_id>', methods=['POST'])
@@ -37,6 +39,13 @@ def create_led_blueprint(socketio):
         command = request.form.get('command')
         send_command_to_device(device_id, command)
         emit_led_status(device_id)
+        return '', 204
+
+    @led_blueprint.route('/control_socket/<device_id>', methods=['POST'])
+    def control_socket(device_id):
+        command = request.form.get('command')
+        send_socket_command(device_id, command)
+        emit_socket_status(device_id)
         return '', 204
 
     def send_command_to_device(device_id, command):
@@ -49,13 +58,47 @@ def create_led_blueprint(socketio):
         except ConnectionError:
             esp_devices[device_id]['status'] = 'not connected'
 
+    def send_socket_command(device_id, command):
+        try:
+            response = requests.post(
+                f"http://{socket_devices[device_id]['ip']}/rpc/Switch.Set",
+                json={"id": 0, "on": command == 'on'},
+                timeout=2
+            )
+            if response.status_code == 200:
+                socket_devices[device_id]['status'] = command
+            else:
+                socket_devices[device_id]['status'] = 'error'
+        except ConnectionError:
+            socket_devices[device_id]['status'] = 'not connected'
+
+    def update_socket_status(device_id):
+        try:
+            response = requests.get(
+                f"http://{socket_devices[device_id]['ip']}/rpc/Switch.GetStatus",
+                params={"id": 0},
+                timeout=2
+            )
+            if response.status_code == 200:
+                data = response.json()
+                socket_devices[device_id]['status'] = 'on' if data.get('output') else 'off'
+            else:
+                socket_devices[device_id]['status'] = 'unknown'
+        except ConnectionError:
+            socket_devices[device_id]['status'] = 'not connected'
+
     @socketio.on('connect')
     def on_connect():
         for device_id in esp_devices:
             emit_led_status(device_id)
+        for device_id in socket_devices:
+            emit_socket_status(device_id)
 
     def emit_led_status(device_id):
         socketio.emit('led_status', {'device_id': device_id, 'status': esp_devices[device_id]['status']})
+
+    def emit_socket_status(device_id):
+        socketio.emit('socket_status', {'device_id': device_id, 'status': socket_devices[device_id]['status']})
 
     for device_id in esp_devices:
         try:
@@ -63,5 +106,9 @@ def create_led_blueprint(socketio):
             esp_devices[device_id]['status'] = 'off'
         except:
             esp_devices[device_id]['status'] = 'not connected'
+
+    for device_id in socket_devices:
+        update_socket_status(device_id)
+        emit_socket_status(device_id)
 
     return led_blueprint

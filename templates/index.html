@@ -88,6 +88,13 @@
     {{ macros.render_device(device_id, device) }}
 {% endfor %}
 </div>
+
+<h2>Socket Devices</h2>
+<div class="device-container">
+{% for device_id, device in sockets.items() %}
+    {{ macros.render_socket(device_id, device) }}
+{% endfor %}
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -102,11 +109,26 @@
                 statusElement.className = 'status-' + data.status;
             }
         });
+
+        socket.on('socket_status', function(data) {
+            var statusElement = document.getElementById('socket-status-' + data.device_id);
+            if (statusElement) {
+                statusElement.innerText = 'Socket Status: ' + data.status.toUpperCase();
+                statusElement.className = 'status-' + data.status;
+            }
+        });
     });
 
     function sendCommand(deviceId, command) {
         var xhr = new XMLHttpRequest();
         xhr.open("POST", '/control_led/' + deviceId, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.send('command=' + command);
+    }
+
+    function sendSocketCommand(deviceId, command) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", '/control_socket/' + deviceId, true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.send('command=' + command);
     }
