@@ -133,6 +133,27 @@ def create_power_blueprint(socketio, db):
 
                 socketio.sleep(poll_interval)
 
+    def _cleanup_old_data(app):
+        retention_days = app.config.get("POWER_RETENTION_DAYS", 7) or 7
+        cleanup_interval_seconds = max(retention_days, 1) * 24 * 60 * 60
+
+        with app.app_context():
+            while True:
+                try:
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+                    deleted = PowerData.query.filter(PowerData.timestamp < cutoff).delete()
+                    db.session.commit()
+                    app.logger.info(
+                        "Power cleanup removed %s rows older than %s days",
+                        deleted,
+                        retention_days,
+                    )
+                except Exception:
+                    db.session.rollback()
+                    app.logger.exception("Power cleanup failed")
+
+                socketio.sleep(cleanup_interval_seconds)
+
     @power_blueprint.record_once
     def start_collectors(state):
         app = state.app
@@ -147,6 +168,11 @@ def create_power_blueprint(socketio, db):
 
             device_flags[started_key] = True
             socketio.start_background_task(_collect_device_data, app, device)
+
+        cleanup_key = "started::power_cleanup"
+        if not device_flags.get(cleanup_key):
+            device_flags[cleanup_key] = True
+            socketio.start_background_task(_cleanup_old_data, app)
 
     @power_blueprint.route("/power")
     def power_dashboard():
