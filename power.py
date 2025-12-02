@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -27,7 +27,9 @@ def create_power_blueprint(socketio, db):
         current = db.Column(db.Float)
         power = db.Column(db.Float)
         energy = db.Column(db.Float)
-        timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+        timestamp = db.Column(
+            db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+        )
 
     def _load_devices_from_config_file() -> Optional[List[Dict[str, str]]]:
         config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -120,7 +122,9 @@ def create_power_blueprint(socketio, db):
                             "current": sample.current,
                             "power": sample.power,
                             "energy": sample.energy,
-                            "timestamp": sample.timestamp.isoformat(),
+                            "timestamp": (sample.timestamp or datetime.utcnow())
+                            .replace(tzinfo=timezone.utc)
+                            .isoformat(),
                         },
                     )
                 except Exception:
@@ -168,17 +172,20 @@ def create_power_blueprint(socketio, db):
             .limit(limited_rows)
         )
 
-        data = [
-            {
-                "device_id": row.device_id,
-                "voltage": row.voltage,
-                "current": row.current,
-                "power": row.power,
-                "energy": row.energy,
-                "timestamp": row.timestamp.isoformat(),
-            }
-            for row in query
-        ]
+        data = []
+        for row in query:
+            timestamp = row.timestamp or datetime.utcnow()
+            aware_ts = timestamp.replace(tzinfo=timezone.utc)
+            data.append(
+                {
+                    "device_id": row.device_id,
+                    "voltage": row.voltage,
+                    "current": row.current,
+                    "power": row.power,
+                    "energy": row.energy,
+                    "timestamp": aware_ts.isoformat(),
+                }
+            )
 
         return jsonify(data)
 
