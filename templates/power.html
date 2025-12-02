@@ -153,18 +153,6 @@
         powerChart.update();
     }
 
-    function ingestSamples(newSamples) {
-        const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
-        const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
-        newSamples.forEach(sample => {
-            sample.timestamp = new Date(sample.timestamp);
-        });
-        samples = samples.concat(newSamples);
-        trimSamples(durationSeconds, maxSamples);
-        renderChart();
-        updateStats(samples[samples.length - 1]);
-    }
-
     async function fetchHistoricalData() {
         const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
         const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
@@ -172,7 +160,7 @@
         const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&limit=${maxSamples}&device_id=${selectedDeviceId}`);
         const data = await response.json();
 
-        samples = data;
+        samples = data.map(sample => ({ ...sample, timestamp: new Date(sample.timestamp) }));
         trimSamples(durationSeconds, maxSamples);
         renderChart();
         updateStats(samples[samples.length - 1]);
@@ -208,7 +196,8 @@
     socket.on('power_sample', sample => {
         console.log("Selected:", selectedDeviceId, "Sample:", sample);
         if (sample.device_id === selectedDeviceId) {
-            ingestSamples([sample]);
+            const normalized = { ...sample, timestamp: new Date(sample.timestamp) };
+            updateStats(normalized);
         }
     });
 
