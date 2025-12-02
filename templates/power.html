@@ -45,6 +45,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
 <script>
     const socket = io();
     const chartCtx = document.getElementById('powerChart').getContext('2d');
@@ -154,18 +156,26 @@
     function ingestSamples(newSamples) {
         const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
         const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
-        samples = samples.concat(newSamples.filter(s => !selectedDeviceId || s.device_id === selectedDeviceId));
+        newSamples.forEach(sample => {
+            sample.timestamp = new Date(sample.timestamp);
+        });
+        samples = samples.concat(newSamples);
         trimSamples(durationSeconds, maxSamples);
         renderChart();
         updateStats(samples[samples.length - 1]);
     }
 
     async function fetchHistoricalData() {
-        const durationSeconds = document.getElementById('timeRange').value;
-        const maxSamples = document.getElementById('sampleLimit').value;
-        const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&limit=${maxSamples}&device_id=${selectedDeviceId || ''}`);
+        const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
+        const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
+
+        const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&limit=${maxSamples}&device_id=${selectedDeviceId}`);
         const data = await response.json();
-        ingestSamples(data);
+
+        samples = data;
+        trimSamples(durationSeconds, maxSamples);
+        renderChart();
+        updateStats(samples[samples.length - 1]);
     }
 
     async function loadDevices() {
@@ -173,15 +183,16 @@
         availableDevices = await response.json();
         const selector = document.getElementById('deviceSelector');
         selector.innerHTML = '';
-        availableDevices.forEach((device, index) => {
+        availableDevices.forEach((device) => {
             const option = document.createElement('option');
             option.value = device.id;
             option.textContent = device.name;
             selector.appendChild(option);
-            if (index === 0 && !selectedDeviceId) {
-                selectedDeviceId = device.id;
-            }
         });
+
+        if (!selectedDeviceId && availableDevices.length > 0) {
+            selectedDeviceId = availableDevices[0].id;
+        }
         selector.value = selectedDeviceId;
     }
 
@@ -195,14 +206,17 @@
     });
 
     socket.on('power_sample', sample => {
-        if (!selectedDeviceId || sample.device_id === selectedDeviceId) {
+        console.log("Selected:", selectedDeviceId, "Sample:", sample);
+        if (sample.device_id === selectedDeviceId) {
             ingestSamples([sample]);
         }
     });
 
     document.addEventListener('DOMContentLoaded', () => {
         buildChart();
-        loadDevices().then(fetchHistoricalData);
+        loadDevices().then(() => {
+            fetchHistoricalData();
+        });
     });
 </script>
 {% endblock %}
