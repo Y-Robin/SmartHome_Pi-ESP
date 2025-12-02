@@ -1,3 +1,5 @@
+import os
+import yaml
 from flask import Flask
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
@@ -15,6 +17,34 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
+
+
+def _load_power_devices_from_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    if not os.path.exists(config_path):
+        return None
+
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file) or {}
+
+    devices_cfg = config.get('socket_devices', {})
+    devices = []
+    for device_id, props in devices_cfg.items():
+        ip = (props or {}).get('ip')
+        if not ip:
+            continue
+        devices.append({
+            'id': device_id,
+            'name': props.get('name') or device_id,
+            'url': f"http://{ip}/rpc/Switch.GetStatus?id=0",
+        })
+
+    return devices or None
+
+
+power_devices = _load_power_devices_from_config()
+if power_devices:
+    app.config['POWER_DEVICES'] = power_devices
 
 led_blueprint = led.create_led_blueprint(socketio)
 temperature_blueprint = temperature.create_temperature_blueprint(socketio, db)

@@ -1,8 +1,10 @@
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
 from flask import Blueprint, current_app, jsonify, render_template, request
+import yaml
 
 
 DEFAULT_DEVICE_URL = "http://192.168.178.52/rpc/Switch.GetStatus?id=0"
@@ -37,17 +39,53 @@ def create_power_blueprint(socketio, db):
             power_value = payload.get("power")
         return power_value
 
+    def _load_devices_from_config_file() -> Optional[List[Dict[str, str]]]:
+        config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+        if not os.path.exists(config_path):
+            return None
+
+        try:
+            with open(config_path, "r") as file:
+                config = yaml.safe_load(file) or {}
+        except Exception:
+            current_app.logger.exception("Failed to read power config file")
+            return None
+
+        configured = []
+        for device_id, props in (config.get("socket_devices") or {}).items():
+            ip = (props or {}).get("ip")
+            if not ip:
+                continue
+            configured.append(
+                {
+                    "id": device_id,
+                    "name": (props or {}).get("name") or device_id,
+                    "url": f"http://{ip}/rpc/Switch.GetStatus?id=0",
+                }
+            )
+
+        return configured or None
+
     def _get_configured_devices(app) -> List[Dict[str, str]]:
         configured_devices = app.config.get("POWER_DEVICES")
         if configured_devices:
             return configured_devices
+
+        loaded = _load_devices_from_config_file()
+        if loaded:
+            app.config["POWER_DEVICES"] = loaded
+            return loaded
+
         return DEFAULT_DEVICES
 
     def _resolve_device_id(app, device_id: Optional[str]) -> str:
-        if device_id:
-            return device_id
         devices = _get_configured_devices(app)
-        return devices[0].get("id") or devices[0].get("url")
+        configured_ids = {d.get("id") or d.get("url") for d in devices}
+
+        if device_id and device_id in configured_ids:
+            return device_id
+
+        return next(iter(configured_ids))
 
     def _collect_device_data(app, device_config: Dict[str, str]):
         device_url = device_config.get("url") or DEFAULT_DEVICE_URL
