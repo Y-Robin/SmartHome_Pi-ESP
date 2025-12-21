@@ -60,6 +60,7 @@ void setup() {
   Serial.println();
   Serial.print("WiFi connected. IP: ");
   Serial.println(WiFi.localIP());
+  Serial.println(WiFi.macAddress());
 
   // Webserver-Routen
   server.on("/", handleRoot);
