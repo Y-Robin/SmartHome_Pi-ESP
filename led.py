@@ -44,7 +44,11 @@ def create_led_blueprint(socketio):
     @led_blueprint.route('/control_socket/<device_id>', methods=['POST'])
     def control_socket(device_id):
         command = request.form.get('command')
+
         send_socket_command(device_id, command)
+
+        update_socket_status(device_id)
+
         emit_socket_status(device_id)
         return '', 204
 
@@ -60,17 +64,25 @@ def create_led_blueprint(socketio):
 
     def send_socket_command(device_id, command):
         try:
-            response = requests.post(
-                f"http://{socket_devices[device_id]['ip']}/rpc/Switch.Set",
-                json={"id": 0, "on": command == 'on'},
-                timeout=2
-            )
-            if response.status_code == 200:
-                socket_devices[device_id]['status'] = command
+            if command == 'toggle':
+                response = requests.post(
+                    f"http://{socket_devices[device_id]['ip']}/rpc/Switch.Toggle",
+                    json={"id": 0},
+                    timeout=2
+                )
             else:
+                response = requests.post(
+                    f"http://{socket_devices[device_id]['ip']}/rpc/Switch.Set",
+                    json={"id": 0, "on": command == 'on'},
+                    timeout=2
+                )
+
+            if response.status_code != 200:
                 socket_devices[device_id]['status'] = 'error'
+
         except ConnectionError:
             socket_devices[device_id]['status'] = 'not connected'
+
 
     def update_socket_status(device_id):
         try:
