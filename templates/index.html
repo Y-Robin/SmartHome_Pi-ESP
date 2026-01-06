@@ -104,6 +104,12 @@
                             </div>
                         {% endif %}
 
+                        <div class="element-list">
+                            {% for element in device.elements %}
+                                <span class="pill pill-light">{{ element }}</span>
+                            {% endfor %}
+                        </div>
+
                         <div class="control-group">
                             {% if 'Led' in device.elements %}
                                 <div class="control-row">
@@ -124,12 +130,6 @@
                                     </div>
                                 </div>
                             {% endif %}
-                        </div>
-
-                        <div class="element-list">
-                            {% for element in device.elements %}
-                                <span class="pill pill-light">{{ element }}</span>
-                            {% endfor %}
                         </div>
                     </div>
                 {% endfor %}
