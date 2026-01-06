@@ -193,15 +193,20 @@ def create_led_blueprint(socketio: SocketIO, db):
                 continue
 
             room = device.get("room", "Allgemein")
+            status = device.get("status", "unknown")
+            connection_status = derive_connection_status(status)
             rooms.setdefault(room, []).append(
                 {
                     "id": device_id,
                     "name": device.get("name", device_id),
                     "ip": device.get("ip", "-"),
                     "elements": elements,
-                    "status": device.get("status", "unknown"),
+                    "status": status,
                     "type": "socket" if device_id in socket_devices else "esp",
-                    "reading": latest_readings.get(device_id),
+                    "connection_status": connection_status,
+                    "reading": latest_readings.get(device_id)
+                    if connection_status == "connected"
+                    else None,
                 }
             )
 
@@ -213,6 +218,16 @@ def create_led_blueprint(socketio: SocketIO, db):
     def is_actionable(elements: List[str]) -> bool:
         actionable_elements = {"Led", "Socket", "Temperature"}
         return any(elem in actionable_elements for elem in elements)
+
+    def derive_connection_status(status: str) -> str:
+        status = (status or "").lower()
+        if status in {"not connected"}:
+            return "disconnected"
+        if status in {"error"}:
+            return "error"
+        if status in {"on", "off", "unknown"}:
+            return "connected" if status in {"on", "off"} else "unknown"
+        return "unknown"
 
     def fetch_weather():
         locations = {

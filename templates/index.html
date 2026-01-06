@@ -70,27 +70,37 @@
             </div>
             <div class="device-grid">
                 {% for device in devices %}
-                    <div class="device-card" data-device="{{ device.id }}">
+                    <div class="device-card {{ device.type }}" data-device="{{ device.id }}">
                         <div class="device-head">
                             <div>
-                                <p class="eyebrow">{{ device.type | capitalize }}</p>
+                                <div class="device-meta">
+                                    <span class="pill pill-outline device-type device-type-{{ device.type }}">{{ 'ESP' if device.type == 'esp' else 'Socket' }}</span>
+                                    <span class="pill pill-light">{{ device.id }}</span>
+                                </div>
                                 <h3>{{ device.name }}</h3>
                                 <p class="muted">IP: {{ device.ip }}</p>
                             </div>
-                            <span class="status-pill status-{{ device.status | default('unknown') | replace(' ', '-') }}">{{ device.status | default('unbekannt') }}</span>
+                            {% set conn = device.connection_status %}
+                            <div class="status-stack">
+                                <span class="status-pill status-{{ conn }}">{% if conn == 'connected' %}Connected{% elif conn == 'disconnected' %}Disconnected{% elif conn == 'error' %}Error{% else %}Unbekannt{% endif %}</span>
+                                <p class="muted status-sub">{% if device.type == 'esp' %}ESP{% else %}Steckdose{% endif %}</p>
+                            </div>
                         </div>
 
-                        {% if 'Temperature' in device.elements and device.reading %}
+                        {% if 'Temperature' in device.elements %}
+                            {% set temp_value = device.reading.temperature | round(1) ~ '°C' if device.reading else '—' %}
+                            {% set humidity_value = device.reading.humidity | round(1) ~ '%' if device.reading else '—' %}
+                            {% set note_value = 'Letztes Update: ' ~ device.reading.timestamp.strftime('%d.%m.%Y %H:%M') if device.reading else 'Keine Messwerte' %}
                             <div class="device-readings">
                                 <div>
                                     <p class="label">Temperatur</p>
-                                    <p class="value">{{ device.reading.temperature | round(1) }}°C</p>
+                                    <p class="value" data-field="temp" data-online="{{ temp_value }}">{% if conn == 'connected' %}{{ temp_value }}{% else %}—{% endif %}</p>
                                 </div>
                                 <div>
                                     <p class="label">Luftfeuchte</p>
-                                    <p class="value">{{ device.reading.humidity | round(1) }}%</p>
+                                    <p class="value" data-field="humidity" data-online="{{ humidity_value }}">{% if conn == 'connected' %}{{ humidity_value }}{% else %}—{% endif %}</p>
                                 </div>
-                                <p class="muted">Letztes Update: {{ device.reading.timestamp.strftime('%d.%m.%Y %H:%M') }}</p>
+                                <p class="muted reading-note" data-field="note" data-online="{{ note_value }}">{% if conn == 'connected' %}{{ note_value }}{% else %}Keine Verbindung{% endif %}</p>
                             </div>
                         {% endif %}
 
@@ -98,9 +108,9 @@
                             {% if 'Led' in device.elements %}
                                 <div class="control-row">
                                     <p class="label">LED</p>
-                                    <div class="button-row">
-                                        <button onclick="sendCommand('{{ device.id }}', 'on')">An</button>
-                                        <button onclick="sendCommand('{{ device.id }}', 'off')">Aus</button>
+                                    <div class="state-toggle">
+                                        <button class="state-button {% if device.status == 'on' %}active{% endif %}" data-state="on" onclick="sendCommand('{{ device.id }}', 'on')">An</button>
+                                        <button class="state-button {% if device.status == 'off' %}active{% endif %}" data-state="off" onclick="sendCommand('{{ device.id }}', 'off')">Aus</button>
                                     </div>
                                 </div>
                             {% endif %}
@@ -108,9 +118,9 @@
                             {% if 'Socket' in device.elements %}
                                 <div class="control-row">
                                     <p class="label">Steckdose</p>
-                                    <div class="button-row">
-                                        <button onclick="sendSocketCommand('{{ device.id }}', 'on')">An</button>
-                                        <button onclick="sendSocketCommand('{{ device.id }}', 'off')">Aus</button>
+                                    <div class="state-toggle">
+                                        <button class="state-button {% if device.status == 'on' %}active{% endif %}" data-state="on" onclick="sendSocketCommand('{{ device.id }}', 'on')">An</button>
+                                        <button class="state-button {% if device.status == 'off' %}active{% endif %}" data-state="off" onclick="sendSocketCommand('{{ device.id }}', 'off')">Aus</button>
                                     </div>
                                 </div>
                             {% endif %}
@@ -138,25 +148,56 @@
 
     socket.on('connect', function() {
         socket.on('led_status', function(data) {
-            var pill = document.querySelector('[data-device="' + data.device_id + '"] .status-pill');
-            var statusText = data.status || 'unbekannt';
-            var statusClass = statusText.toString().replace(/\s+/g, '-');
-            if (pill) {
-                pill.innerText = statusText;
-                pill.className = 'status-pill status-' + statusClass;
-            }
+            updateDeviceState(data.device_id, data.status);
         });
 
         socket.on('socket_status', function(data) {
-            var pill = document.querySelector('[data-device="' + data.device_id + '"] .status-pill');
-            var statusText = data.status || 'unbekannt';
-            var statusClass = statusText.toString().replace(/\s+/g, '-');
-            if (pill) {
-                pill.innerText = statusText;
-                pill.className = 'status-pill status-' + statusClass;
-            }
+            updateDeviceState(data.device_id, data.status);
         });
     });
+
+    function normalizeConnection(status) {
+        var value = (status || '').toString().toLowerCase();
+        if (value === 'not connected' || value === 'disconnected') return 'disconnected';
+        if (value === 'error') return 'error';
+        if (value === 'on' || value === 'off') return 'connected';
+        return 'unknown';
+    }
+
+    function connectionLabel(connection) {
+        if (connection === 'connected') return 'Connected';
+        if (connection === 'disconnected') return 'Disconnected';
+        if (connection === 'error') return 'Error';
+        return 'Unbekannt';
+    }
+
+    function updateDeviceState(deviceId, status) {
+        var card = document.querySelector('[data-device="' + deviceId + '"]');
+        if (!card) return;
+
+        var connection = normalizeConnection(status);
+        var pill = card.querySelector('.status-pill');
+        if (pill) {
+            pill.innerText = connectionLabel(connection);
+            pill.className = 'status-pill status-' + connection;
+        }
+
+        card.querySelectorAll('.state-toggle .state-button').forEach(function(button) {
+            var target = (button.dataset.state || '').toLowerCase();
+            button.classList.toggle('active', status && status.toLowerCase() === target);
+        });
+
+        card.querySelectorAll('[data-field]').forEach(function(el) {
+            var field = el.dataset.field;
+            if (connection === 'connected') {
+                el.textContent = el.dataset.online || '—';
+            } else if (field === 'note') {
+                el.textContent = 'Keine Verbindung';
+            } else {
+                el.textContent = '—';
+            }
+        });
+    }
 
     function sendCommand(deviceId, command) {
         var xhr = new XMLHttpRequest();
