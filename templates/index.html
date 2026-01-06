@@ -1,100 +1,135 @@
 {% extends "base.html" %}
 
-{% import "macros.html" as macros %}
-
-{% block title %}Home Page{% endblock %}
+{% block title %}Home{% endblock %}
 
 {% block content %}
-<style>
-    h2 {
-        text-align: center;
-        margin-top: 40px;
-        color: #333;
-    }
-
-    .device-container {
-        display: flex;
-        justify-content: space-around;
-        flex-wrap: wrap;
-        margin: 20px;
-    }
-
-    .device {
-        border: 1px solid #ddd;
-        padding: 20px;
-        margin: 10px;
-        text-align: center;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-        transition: 0.3s;
-    }
-
-    .device:hover {
-        box-shadow: 0 8px 16px 0 rgba(0,0,0,0.4);
-    }
-
-    .device h3 {
-        color: #007bff;
-    }
-
-    .device p {
-        font-size: 16px;
-    }
-
-    .device button {
-        padding: 10px 20px;
-        margin: 5px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-
-    .device button:hover {
-        opacity: 0.8;
-    }
-
-    .status-on {
-        color: green;
-    }
-
-    .status-off {
-        color: red;
-    }
-
-    .connected-elements {
-        font-style: italic;
-        margin-top: 10px;
-    }
-</style>
-
-<h2>ESP Devices</h2>
-<div class="device-container">
-{% for device_id, device in devices.items() %}
-    {{ macros.render_device(device_id, device) }}
-{% endfor %}
+<div class="page-hero">
+    <div>
+        <p class="eyebrow">SmartHome</p>
+        <h1>Kontrollzentrum</h1>
+        <p class="subhead">Steuere deine Geräte, behalte die Räume im Blick und sieh sofort die letzten Messwerte.</p>
+    </div>
 </div>
 
-<h2>Camera Devices</h2>
-<div class="device-container">
-{% for device_id, device in cameras.items() %}
-    {{ macros.render_device(device_id, device) }}
-{% endfor %}
-</div>
+<section class="card-grid weather-grid">
+    {% for report in weather %}
+    <article class="card weather-card">
+        <div class="card-header">
+            <div>
+                <p class="eyebrow">Wetter</p>
+                <h3>{{ report.location }}</h3>
+            </div>
+            {% if report.temperature is not none %}
+                <span class="pill">Aktuell</span>
+            {% else %}
+                <span class="pill pill-error">Offline</span>
+            {% endif %}
+        </div>
+        {% if report.error %}
+            <p class="error-text">{{ report.error }}</p>
+        {% else %}
+            <div class="weather-values">
+                <div>
+                    <p class="label">Temperatur</p>
+                    <p class="value">{% if report.temperature is not none %}{{ report.temperature | round(1) }}°C{% else %}—{% endif %}</p>
+                </div>
+                <div>
+                    <p class="label">Luftfeuchte</p>
+                    <p class="value">{% if report.humidity is not none %}{{ report.humidity }}%{% else %}—{% endif %}</p>
+                </div>
+            </div>
+            <div class="forecast">
+                <div>
+                    <p class="label">Max</p>
+                    <p class="value">{{ report.forecast_max | default('—') }}°C</p>
+                </div>
+                <div>
+                    <p class="label">Min</p>
+                    <p class="value">{{ report.forecast_min | default('—') }}°C</p>
+                </div>
+                <div>
+                    <p class="label">Regen</p>
+                    <p class="value">{{ report.precipitation_probability | default('—') }}%</p>
+                </div>
+            </div>
+        {% endif %}
+    </article>
+    {% endfor %}
+</section>
 
-<h2>Robot Devices</h2>
-<div class="device-container">
-{% for device_id, device in robots.items() %}
-    {{ macros.render_device(device_id, device) }}
-{% endfor %}
-</div>
+{% if has_devices %}
+<section class="rooms">
+    {% for room, devices in device_rooms.items() %}
+        <article class="card room-card">
+            <div class="card-header">
+                <div>
+                    <p class="eyebrow">Raum</p>
+                    <h2>{{ room }}</h2>
+                </div>
+                <span class="pill">{{ devices|length }} Geräte</span>
+            </div>
+            <div class="device-grid">
+                {% for device in devices %}
+                    <div class="device-card" data-device="{{ device.id }}">
+                        <div class="device-head">
+                            <div>
+                                <p class="eyebrow">{{ device.type | capitalize }}</p>
+                                <h3>{{ device.name }}</h3>
+                                <p class="muted">IP: {{ device.ip }}</p>
+                            </div>
+                            <span class="status-pill status-{{ device.status | default('unknown') | replace(' ', '-') }}">{{ device.status | default('unbekannt') }}</span>
+                        </div>
 
-<h2>Socket Devices</h2>
-<div class="device-container">
-{% for device_id, device in sockets.items() %}
-    {{ macros.render_socket(device_id, device) }}
-{% endfor %}
-</div>
+                        {% if 'Temperature' in device.elements and device.reading %}
+                            <div class="device-readings">
+                                <div>
+                                    <p class="label">Temperatur</p>
+                                    <p class="value">{{ device.reading.temperature | round(1) }}°C</p>
+                                </div>
+                                <div>
+                                    <p class="label">Luftfeuchte</p>
+                                    <p class="value">{{ device.reading.humidity | round(1) }}%</p>
+                                </div>
+                                <p class="muted">Letztes Update: {{ device.reading.timestamp.strftime('%d.%m.%Y %H:%M') }}</p>
+                            </div>
+                        {% endif %}
+
+                        <div class="control-group">
+                            {% if 'Led' in device.elements %}
+                                <div class="control-row">
+                                    <p class="label">LED</p>
+                                    <div class="button-row">
+                                        <button onclick="sendCommand('{{ device.id }}', 'on')">An</button>
+                                        <button onclick="sendCommand('{{ device.id }}', 'off')">Aus</button>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            {% if 'Socket' in device.elements %}
+                                <div class="control-row">
+                                    <p class="label">Steckdose</p>
+                                    <div class="button-row">
+                                        <button onclick="sendSocketCommand('{{ device.id }}', 'on')">An</button>
+                                        <button onclick="sendSocketCommand('{{ device.id }}', 'off')">Aus</button>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="element-list">
+                            {% for element in device.elements %}
+                                <span class="pill pill-light">{{ element }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </article>
+    {% endfor %}
+</section>
+{% else %}
+    <p class="muted">Keine steuerbaren Geräte gefunden.</p>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -103,18 +138,22 @@
 
     socket.on('connect', function() {
         socket.on('led_status', function(data) {
-            var statusElement = document.getElementById('status-' + data.device_id);
-            if (statusElement) {
-                statusElement.innerText = 'LED Status: ' + data.status.toUpperCase();
-                statusElement.className = 'status-' + data.status;
+            var pill = document.querySelector('[data-device="' + data.device_id + '"] .status-pill');
+            var statusText = data.status || 'unbekannt';
+            var statusClass = statusText.toString().replace(/\s+/g, '-');
+            if (pill) {
+                pill.innerText = statusText;
+                pill.className = 'status-pill status-' + statusClass;
             }
         });
 
         socket.on('socket_status', function(data) {
-            var statusElement = document.getElementById('socket-status-' + data.device_id);
-            if (statusElement) {
-                statusElement.innerText = 'Socket Status: ' + data.status.toUpperCase();
-                statusElement.className = 'status-' + data.status;
+            var pill = document.querySelector('[data-device="' + data.device_id + '"] .status-pill');
+            var statusText = data.status || 'unbekannt';
+            var statusClass = statusText.toString().replace(/\s+/g, '-');
+            if (pill) {
+                pill.innerText = statusText;
+                pill.className = 'status-pill status-' + statusClass;
             }
         });
     });
