@@ -16,6 +16,8 @@ def create_temperature_blueprint(socketio, db):
     temperature_blueprint = Blueprint('temperature', __name__)
 
     class TemperatureData(db.Model):
+        __tablename__ = 'temperature_data'
+        __table_args__ = {'extend_existing': True}
         id = db.Column(db.Integer, primary_key=True)
         device_id = db.Column(db.String(50))  # New field for device ID
         temperature = db.Column(db.Float, nullable=False)
