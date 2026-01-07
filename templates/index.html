@@ -19,7 +19,10 @@
                 <p class="eyebrow">Wetter</p>
                 <div class="weather-title">
                     <h3>{{ report.location }}</h3>
-                    <span class="weather-symbol" aria-hidden="true">{{ report.symbol }}</span>
+                    <div class="weather-icon">
+                        <span class="weather-symbol" aria-hidden="true">{{ report.symbol }}</span>
+                        <span class="weather-condition">{{ report.condition }}</span>
+                    </div>
                 </div>
             </div>
             {% if report.temperature is not none %}

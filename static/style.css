@@ -149,9 +149,22 @@ body {
     gap: 8px;
 }
 
+.weather-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
 .weather-symbol {
     font-size: 24px;
     line-height: 1;
+}
+
+.weather-condition {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
 }
 
 .weather-values,

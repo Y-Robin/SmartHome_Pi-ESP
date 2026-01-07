@@ -236,30 +236,30 @@ def create_led_blueprint(socketio: SocketIO, db):
             "Saarbrücken": {"latitude": 49.2402, "longitude": 6.9969},
         }
 
-        def weather_symbol(code):
+        def weather_summary(code):
             if code is None:
-                return "—"
+                return {"symbol": "—", "label": "Keine Daten"}
             if code == 0:
-                return "☀️"
+                return {"symbol": "☀️", "label": "Klar"}
             if code in {1, 2}:
-                return "🌤️"
+                return {"symbol": "🌤️", "label": "Leicht bewölkt"}
             if code == 3:
-                return "☁️"
+                return {"symbol": "☁️", "label": "Bewölkt"}
             if code in {45, 48}:
-                return "🌫️"
+                return {"symbol": "🌫️", "label": "Nebel"}
             if 51 <= code <= 57:
-                return "🌦️"
+                return {"symbol": "🌦️", "label": "Nieselregen"}
             if 61 <= code <= 67:
-                return "🌧️"
+                return {"symbol": "🌧️", "label": "Regen"}
             if 71 <= code <= 77:
-                return "🌨️"
+                return {"symbol": "🌨️", "label": "Schnee"}
             if 80 <= code <= 82:
-                return "🌦️"
+                return {"symbol": "🌦️", "label": "Schauer"}
             if 85 <= code <= 86:
-                return "🌨️"
+                return {"symbol": "🌨️", "label": "Schneeschauer"}
             if code in {95, 96, 99}:
-                return "⛈️"
-            return "—"
+                return {"symbol": "⛈️", "label": "Gewitter"}
+            return {"symbol": "—", "label": "Unbekannt"}
 
         weather_reports = []
         for name, coords in locations.items():
@@ -281,13 +281,15 @@ def create_led_blueprint(socketio: SocketIO, db):
                 current = payload.get("current", {})
                 daily = payload.get("daily", {})
 
+                summary = weather_summary(current.get("weather_code"))
                 weather_reports.append(
                     {
                         "location": name,
                         "temperature": current.get("temperature_2m"),
                         "humidity": current.get("relative_humidity_2m"),
                         "weather_code": current.get("weather_code"),
-                        "symbol": weather_symbol(current.get("weather_code")),
+                        "symbol": summary["symbol"],
+                        "condition": summary["label"],
                         "forecast_max": (daily.get("temperature_2m_max") or [None])[0],
                         "forecast_min": (daily.get("temperature_2m_min") or [None])[0],
                         "precipitation_probability": (daily.get("precipitation_probability_max") or [None])[0],
@@ -301,6 +303,7 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "humidity": None,
                         "weather_code": None,
                         "symbol": "—",
+                        "condition": "Keine Daten",
                         "forecast_max": None,
                         "forecast_min": None,
                         "precipitation_probability": None,
