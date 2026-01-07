@@ -424,7 +424,13 @@ button:active {
     margin: 0;
 }
 
+.chart-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .chart-card canvas {
     width: 100%;
-    height: 220px;
+    height: clamp(160px, 25vh, 200px);
 }
