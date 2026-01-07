@@ -18,6 +18,7 @@
             <select id="deviceSelect" onchange="updateChartForSelectedDevice()">
                 <!-- Dynamisch per JS befüllt -->
             </select>
+            <p class="muted" id="deviceRoomDisplay"></p>
         </div>
         <div class="control-field">
             <label for="selectedDate">Datum filtern</label>
@@ -134,10 +135,11 @@
                     const deviceSelect = document.getElementById('deviceSelect');
                     deviceSelect.innerHTML = ''; // Clear existing options
 
-                    devices.forEach(deviceId => {
+                    devices.forEach(device => {
                         const option = document.createElement('option');
-                        option.value = deviceId;
-                        option.textContent = deviceId;
+                        option.value = device.device_id;
+                        option.textContent = device.room ? `${device.device_id} (${device.room})` : device.device_id;
+                        option.dataset.room = device.room || '';
                         deviceSelect.appendChild(option);
                     });
 
@@ -190,6 +192,10 @@
 	function updateChartForSelectedDevice() {
 
 	    const selectedDevice = document.getElementById('deviceSelect').value;
+            const selectedOption = document.getElementById('deviceSelect').selectedOptions[0];
+            const roomDisplay = document.getElementById('deviceRoomDisplay');
+            const roomName = selectedOption ? selectedOption.dataset.room : '';
+            roomDisplay.textContent = roomName ? `Zimmer: ${roomName}` : '';
 
 	    const selectedDateValue = document.getElementById('selectedDate').value;
 
