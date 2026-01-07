@@ -440,12 +440,22 @@ button:active {
 }
 
 .control-inline input[type="date"],
+.control-field input[type="datetime-local"],
+.control-field input[type="text"],
 .control-field select {
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: #fff;
     font-family: inherit;
+}
+
+.calendar-card {
+    padding: 12px;
+}
+
+.calendar-card #calendar {
+    background: #fff;
 }
 
 .temperature-grid {

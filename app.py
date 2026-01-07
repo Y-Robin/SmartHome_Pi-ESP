@@ -2,7 +2,6 @@ import os
 import yaml
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO
-from flask_sqlalchemy import SQLAlchemy
 import temperature
 import power
 import led
@@ -11,11 +10,13 @@ from camera_streamer import camera_blueprint
 from streamEsp import streaming_blueprint, camera_devices
 from videoLib import videoLib_blueprint
 from robot import robot_blueprint  # Neuer Import
+from calendar import create_calendar_blueprint
+from extensions import db
 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
-db = SQLAlchemy(app)
+db.init_app(app)
 socketio = SocketIO(app)
 
 
@@ -50,6 +51,7 @@ led_blueprint = led.create_led_blueprint(socketio, db)
 temperature_blueprint = temperature.create_temperature_blueprint(socketio, db)
 power_blueprint = power.create_power_blueprint(socketio, db)
 stepper_blueprint = stepper.create_stepper_blueprint()
+calendar_blueprint = create_calendar_blueprint()
 
 # Register blueprints
 app.register_blueprint(temperature_blueprint)
@@ -60,6 +62,7 @@ app.register_blueprint(stepper_blueprint)
 app.register_blueprint(streaming_blueprint, url_prefix='/')
 app.register_blueprint(videoLib_blueprint)
 app.register_blueprint(robot_blueprint)  # Registrierung des Roboter-Blueprints
+app.register_blueprint(calendar_blueprint)
 
 
 @app.route('/videoStreams')

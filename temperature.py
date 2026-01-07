@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_socketio import SocketIO
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
-from sqlalchemy import and_
 import yaml
 import os
+
+from models import ShowerEvent
 
 def load_devices_from_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
@@ -23,6 +23,38 @@ def create_temperature_blueprint(socketio, db):
         temperature = db.Column(db.Float, nullable=False)
         humidity = db.Column(db.Float, nullable=False)
         timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def _update_shower_events(device_id):
+        recent_samples = (
+            TemperatureData.query.filter_by(device_id=device_id)
+            .order_by(TemperatureData.timestamp.desc())
+            .limit(3)
+            .all()
+        )
+
+        if len(recent_samples) < 3:
+            return
+
+        humidities = [sample.humidity for sample in recent_samples]
+        open_event = (
+            ShowerEvent.query.filter_by(device_id=device_id, end_time=None)
+            .order_by(ShowerEvent.start_time.desc())
+            .first()
+        )
+
+        if open_event is None and all(humidity > 75 for humidity in humidities):
+            oldest_sample = min(recent_samples, key=lambda sample: sample.timestamp)
+            new_event = ShowerEvent(
+                device_id=device_id,
+                start_time=oldest_sample.timestamp,
+            )
+            db.session.add(new_event)
+            db.session.commit()
+            return
+
+        if open_event and all(humidity < 75 for humidity in humidities):
+            open_event.end_time = recent_samples[0].timestamp
+            db.session.commit()
 
     @temperature_blueprint.route('/temperature')
     def temperature():
@@ -50,6 +82,7 @@ def create_temperature_blueprint(socketio, db):
         )
         db.session.add(new_record) 
         db.session.commit()
+        _update_shower_events(data['device_id'])
         # Emit the new temperature data
         socketio.emit('new_temperature_data', {
             'device_id': data['device_id'],  # Include device_id in the emitted data

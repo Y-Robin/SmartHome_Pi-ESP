@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}Default Title{% endblock %}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    {% block head %}{% endblock %}
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
@@ -18,6 +19,7 @@
         <a href="/">Home</a>
         <a href="/videoStreams">Video Streams</a>
         <a href="/temperature">Temperatur Historie</a>
+        <a href="/calendar">Kalender</a>
         <a href="/power">Power Monitor</a>
         <a href="/stepper">Stepper Motor Control</a>
         <a href="/videoLib">Videos</a>
