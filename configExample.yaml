@@ -1,30 +1,37 @@
 devices:
   ESP_01:
     ip: xxx.xxx.xxx.xx
+    room: Büro
     elements: [Led, Temperature, Stepper]
   ESP_02:
     ip: xxx.xxx.xxx.xx
+    room: Küche
     elements: [Temperature, Led]
   ESP_03:
     ip: xxx.xxx.xxx.xx
+    room: Bad
     elements: [Led, Temperature]
 
 stepper_devices:
   ESP_01:
     ip: xxx.xxx.xxx.xx
+    room: Büro
     elements: [Led, Temperature, Stepper]
 
 camera_devices:
   ESP_CAM:
     ip: xxx.xxx.xxx.xx
+    room: Eingang
     elements: [Camera]
 
 robot_devices:
   ROBOT_01:
     ip: xxx.xxx.xxx.xx
+    room: Wohnzimmer
     elements: [Drive, Snapshot, Command]
 
 socket_devices:
   SOCKET_01:
     ip: 192.168.178.xxx  # Example Shelly Plus Plug S V2
+    room: Wohnzimmer
     elements: [Socket]

@@ -46,7 +46,7 @@ power_devices = _load_power_devices_from_config()
 if power_devices:
     app.config['POWER_DEVICES'] = power_devices
 
-led_blueprint = led.create_led_blueprint(socketio)
+led_blueprint = led.create_led_blueprint(socketio, db)
 temperature_blueprint = temperature.create_temperature_blueprint(socketio, db)
 power_blueprint = power.create_power_blueprint(socketio, db)
 stepper_blueprint = stepper.create_stepper_blueprint()
