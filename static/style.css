@@ -358,6 +358,24 @@ button:active {
     margin-bottom: 20px;
 }
 
+.power-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 8px 0 16px;
+}
+
+.power-meta strong {
+    font-size: 16px;
+    color: #222;
+}
+
+.power-stats .stat-card {
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
 .stat-card {
     background-color: #f8f8f8;
     border-radius: 6px;
@@ -372,10 +390,15 @@ button:active {
     color: #444;
 }
 
-.stat-card p {
+.stat-card .stat-value {
     margin: 0;
     font-size: 20px;
     font-weight: bold;
+}
+
+.stat-card.highlight {
+    background: linear-gradient(135deg, rgba(255, 99, 132, 0.15), rgba(255, 195, 113, 0.2));
+    border: 1px solid rgba(255, 99, 132, 0.2);
 }
 
 .temperature-controls {

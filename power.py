@@ -181,13 +181,11 @@ def create_power_blueprint(socketio, db):
     @power_blueprint.route("/get_power_data")
     def get_power_data():
         duration_seconds = request.args.get("duration_seconds", default=3600, type=int)
-        limit = request.args.get("limit", default=1000, type=int)
         device_id = request.args.get("device_id")
         resolved_device_id = _resolve_device_id(current_app, device_id)
 
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(seconds=max(duration_seconds or 0, 0))
-        limited_rows = max(limit or 0, 1)
 
         query = (
             PowerData.query.filter(
@@ -195,7 +193,6 @@ def create_power_blueprint(socketio, db):
                 PowerData.device_id == resolved_device_id,
             )
             .order_by(PowerData.timestamp.asc())
-            .limit(limited_rows)
         )
 
         data = []
