@@ -6,7 +6,7 @@
 <style>
     .streams-layout {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 240px 1fr;
         gap: 20px;
         padding: 20px;
     }
@@ -25,10 +25,13 @@
     }
 
     .stream-image {
+        width: 640px;
+        height: 480px;
         max-width: 100%;
-        height: auto;
         border: 3px solid #ddd;
         margin-bottom: 10px;
+        object-fit: cover;
+        background: #000;
     }
 
     .button-container,
@@ -72,10 +75,9 @@
     }
 
     .sidebar {
-        margin-bottom: 10px;
-        padding: 10px;
         border: 1px solid #eee;
         border-radius: 6px;
+        padding: 10px;
         background: #fafafa;
     }
 
@@ -89,6 +91,16 @@
         margin-bottom: 6px;
     }
 
+    .sidebar a {
+        color: #007bff;
+        text-decoration: none;
+    }
+
+    .sidebar a.active {
+        font-weight: bold;
+        text-decoration: underline;
+    }
+
     @media (max-width: 900px) {
         .streams-layout {
             grid-template-columns: 1fr;
@@ -97,47 +109,57 @@
 </style>
 
 <div class="streams-layout">
-    <section class="stream-panel">
-        <h2>Pi Camera</h2>
-        <img id="piStream" class="stream-image" src="/stream?mjpeg=1" alt="Pi Camera Stream">
-        <div class="button-container">
-            <button id="piRecordButton" class="control-button" onclick="togglePiRecording()">Start Recording</button>
-            <button id="piLandmarkButton" class="control-button" onclick="togglePiLandmarks()">Enable Landmarks</button>
-            <div id="piRecordingStatus" class="status-pill not-recording">Not Recording</div>
-        </div>
-    </section>
+    <aside class="sidebar">
+        <h3>Video Streams</h3>
+        <ul>
+            <li>
+                <a
+                    href="{{ url_for('video_streams', source='pi') }}"
+                    class="{{ 'active' if selected_source == 'pi' else '' }}"
+                >
+                    Pi Camera
+                </a>
+            </li>
+            {% for cam_name, cam in cameras.items() %}
+                <li>
+                    <a
+                        href="{{ url_for('video_streams', source='esp', cam_id=cam_name) }}"
+                        class="{{ 'active' if selected_source == 'esp' and cam_id == cam_name else '' }}"
+                    >
+                        {{ cam_name }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </aside>
 
     <section class="stream-panel">
-        <h2>ESP Streams</h2>
-        {% if cameras %}
-            <div class="sidebar">
-                <h3>Available Cameras</h3>
-                <ul>
-                    {% for cam_name, cam in cameras.items() %}
-                        <li><a href="{{ url_for('video_streams', cam_id=cam_name) }}">{{ cam_name }}</a></li>
-                    {% endfor %}
-                </ul>
+        {% if selected_source == 'pi' %}
+            <h2>Pi Camera</h2>
+            <img id="piStream" class="stream-image" src="/stream?mjpeg=1" alt="Pi Camera Stream">
+            <div class="button-container">
+                <button id="piRecordButton" class="control-button" onclick="togglePiRecording()">Start Recording</button>
+                <button id="piLandmarkButton" class="control-button" onclick="togglePiLandmarks()">Enable Landmarks</button>
+                <div id="piRecordingStatus" class="status-pill not-recording">Not Recording</div>
             </div>
-            {% if cam_id %}
-                <h3>Stream from {{ cam_id }}</h3>
-                <img id="espStream" class="stream-image" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="ESP Camera Stream">
+        {% elif selected_source == 'esp' and cam_id %}
+            <h2>ESP Stream: {{ cam_id }}</h2>
+            <img id="espStream" class="stream-image" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="ESP Camera Stream">
 
-                <div class="slider-container">
-                    <label for="ledSlider">LED Helligkeit:</label>
-                    <input type="range" id="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
-                    <span id="ledValue">0</span>
-                </div>
+            <div class="slider-container">
+                <label for="ledSlider">LED Helligkeit:</label>
+                <input type="range" id="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
+                <span id="ledValue">0</span>
+            </div>
 
-                <div class="control-buttons">
-                    <button id="espRecordBtn" onclick="toggleEspRecording()">Start Recording</button>
-                    <button id="espLandmarkBtn" onclick="toggleEspLandmarks()">Enable Landmarks</button>
-                    <div id="espRecordStatus" class="status-pill not-recording">Not Recording</div>
-                </div>
-            {% else %}
-                <p>No ESP camera selected.</p>
-            {% endif %}
+            <div class="control-buttons">
+                <button id="espRecordBtn" onclick="toggleEspRecording()">Start Recording</button>
+                <button id="espLandmarkBtn" onclick="toggleEspLandmarks()">Enable Landmarks</button>
+                <div id="espRecordStatus" class="status-pill not-recording">Not Recording</div>
+            </div>
         {% else %}
-            <p>No ESP cameras configured.</p>
+            <h2>No stream selected</h2>
+            <p>Select a stream from the list to start viewing.</p>
         {% endif %}
     </section>
 </div>
@@ -145,16 +167,23 @@
 
 {% block scripts %}
 <script>
+    const selectedSource = "{{ selected_source }}";
     let piIsRecording = false;
     let piLandmarksEnabled = false;
 
     function updatePiRecordingStatus() {
+        if (selectedSource !== 'pi') {
+            return;
+        }
         fetch('/recording_status')
             .then(response => response.json())
             .then(data => {
                 piIsRecording = data.recording;
                 const statusDiv = document.getElementById('piRecordingStatus');
                 const button = document.getElementById('piRecordButton');
+                if (!statusDiv || !button) {
+                    return;
+                }
                 if (piIsRecording) {
                     statusDiv.textContent = 'Recording...';
                     statusDiv.className = 'status-pill recording';
@@ -178,6 +207,9 @@
             .then(data => {
                 piLandmarksEnabled = data.landmark_detection;
                 const button = document.getElementById('piLandmarkButton');
+                if (!button) {
+                    return;
+                }
                 button.textContent = piLandmarksEnabled ? 'Disable Landmarks' : 'Enable Landmarks';
             });
     }
@@ -203,7 +235,7 @@
     }
 
     function updateEspRecordingStatus() {
-        if (!espCamId) {
+        if (selectedSource !== 'esp' || !espCamId) {
             return;
         }
         fetch(`/recording_status/${espCamId}`)

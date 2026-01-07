@@ -64,12 +64,19 @@ app.register_blueprint(robot_blueprint)  # Registrierung des Roboter-Blueprints
 
 @app.route('/videoStreams')
 def video_streams():
+    source = request.args.get('source')
     cam_id = request.args.get('cam_id')
     selected_cam = cam_id if cam_id in camera_devices else None
     if not selected_cam and camera_devices:
         selected_cam = next(iter(camera_devices))
+
+    default_source = 'esp' if camera_devices else 'pi'
+    selected_source = source if source in {'pi', 'esp'} else default_source
+    if selected_source == 'esp' and not camera_devices:
+        selected_source = 'pi'
     return render_template(
         'video_streams.html',
+        selected_source=selected_source,
         cam_id=selected_cam,
         cameras=camera_devices,
     )
