@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}Video Streams{% endblock %}
+
+{% block content %}
+<style>
+    .streams-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        padding: 20px;
+    }
+
+    .stream-panel {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        background: #fff;
+    }
+
+    .stream-panel h2 {
+        margin-top: 0;
+        color: #007bff;
+    }
+
+    .stream-image {
+        max-width: 100%;
+        height: auto;
+        border: 3px solid #ddd;
+        margin-bottom: 10px;
+    }
+
+    .button-container,
+    .control-buttons {
+        margin-top: 10px;
+    }
+
+    .control-button,
+    .control-buttons button {
+        padding: 10px 20px;
+        font-size: 16px;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin: 5px;
+    }
+
+    .control-button:hover,
+    .control-buttons button:hover {
+        background-color: #0056b3;
+    }
+
+    .status-pill {
+        margin-top: 10px;
+        font-size: 16px;
+        padding: 6px 10px;
+        border-radius: 5px;
+        color: white;
+        display: inline-block;
+    }
+
+    .recording {
+        background-color: #dc3545;
+    }
+
+    .not-recording {
+        background-color: #28a745;
+    }
+
+    .sidebar {
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        background: #fafafa;
+    }
+
+    .sidebar ul {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+    }
+
+    .sidebar li {
+        margin-bottom: 6px;
+    }
+
+    @media (max-width: 900px) {
+        .streams-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="streams-layout">
+    <section class="stream-panel">
+        <h2>Pi Camera</h2>
+        <img id="piStream" class="stream-image" src="/stream?mjpeg=1" alt="Pi Camera Stream">
+        <div class="button-container">
+            <button id="piRecordButton" class="control-button" onclick="togglePiRecording()">Start Recording</button>
+            <button id="piLandmarkButton" class="control-button" onclick="togglePiLandmarks()">Enable Landmarks</button>
+            <div id="piRecordingStatus" class="status-pill not-recording">Not Recording</div>
+        </div>
+    </section>
+
+    <section class="stream-panel">
+        <h2>ESP Streams</h2>
+        {% if cameras %}
+            <div class="sidebar">
+                <h3>Available Cameras</h3>
+                <ul>
+                    {% for cam_name, cam in cameras.items() %}
+                        <li><a href="{{ url_for('video_streams', cam_id=cam_name) }}">{{ cam_name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% if cam_id %}
+                <h3>Stream from {{ cam_id }}</h3>
+                <img id="espStream" class="stream-image" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="ESP Camera Stream">
+
+                <div class="slider-container">
+                    <label for="ledSlider">LED Helligkeit:</label>
+                    <input type="range" id="ledSlider" min="0" max="255" value="0" oninput="updateLed(this.value)">
+                    <span id="ledValue">0</span>
+                </div>
+
+                <div class="control-buttons">
+                    <button id="espRecordBtn" onclick="toggleEspRecording()">Start Recording</button>
+                    <button id="espLandmarkBtn" onclick="toggleEspLandmarks()">Enable Landmarks</button>
+                    <div id="espRecordStatus" class="status-pill not-recording">Not Recording</div>
+                </div>
+            {% else %}
+                <p>No ESP camera selected.</p>
+            {% endif %}
+        {% else %}
+            <p>No ESP cameras configured.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let piIsRecording = false;
+    let piLandmarksEnabled = false;
+
+    function updatePiRecordingStatus() {
+        fetch('/recording_status')
+            .then(response => response.json())
+            .then(data => {
+                piIsRecording = data.recording;
+                const statusDiv = document.getElementById('piRecordingStatus');
+                const button = document.getElementById('piRecordButton');
+                if (piIsRecording) {
+                    statusDiv.textContent = 'Recording...';
+                    statusDiv.className = 'status-pill recording';
+                    button.textContent = 'Stop Recording';
+                } else {
+                    statusDiv.textContent = 'Not Recording';
+                    statusDiv.className = 'status-pill not-recording';
+                    button.textContent = 'Start Recording';
+                }
+            });
+    }
+
+    function togglePiRecording() {
+        const url = piIsRecording ? '/stop_recording' : '/start_recording';
+        fetch(url, { method: 'POST' });
+    }
+
+    function togglePiLandmarks() {
+        fetch('/toggle_landmarks', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                piLandmarksEnabled = data.landmark_detection;
+                const button = document.getElementById('piLandmarkButton');
+                button.textContent = piLandmarksEnabled ? 'Disable Landmarks' : 'Enable Landmarks';
+            });
+    }
+
+    const espCamId = "{{ cam_id }}";
+    const esp32Ip = "{{ cameras[cam_id]['ip'] if cam_id else '' }}";
+    let espIsRecording = false;
+
+    function updateLed(val) {
+        document.getElementById("ledValue").textContent = val;
+        if (!esp32Ip) {
+            return;
+        }
+        fetch(`http://${esp32Ip}/control?var=led_intensity&val=${val}`);
+    }
+
+    function toggleEspRecording() {
+        if (!espCamId) {
+            return;
+        }
+        const url = espIsRecording ? `/stop_recording/${espCamId}` : `/start_recording/${espCamId}`;
+        fetch(url, { method: 'POST' }).then(updateEspRecordingStatus);
+    }
+
+    function updateEspRecordingStatus() {
+        if (!espCamId) {
+            return;
+        }
+        fetch(`/recording_status/${espCamId}`)
+            .then(res => res.json())
+            .then(data => {
+                espIsRecording = data.recording;
+                const statusDiv = document.getElementById("espRecordStatus");
+                const button = document.getElementById("espRecordBtn");
+                if (!statusDiv || !button) {
+                    return;
+                }
+                statusDiv.textContent = espIsRecording ? "Recording..." : "Not Recording";
+                statusDiv.className = espIsRecording ? "status-pill recording" : "status-pill not-recording";
+                button.textContent = espIsRecording ? "Stop Recording" : "Start Recording";
+            });
+    }
+
+    function toggleEspLandmarks() {
+        if (!espCamId) {
+            return;
+        }
+        fetch(`/toggle_landmarks/${espCamId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                const button = document.getElementById("espLandmarkBtn");
+                if (!button) {
+                    return;
+                }
+                button.textContent = data.landmarks_enabled ? "Disable Landmarks" : "Enable Landmarks";
+            });
+    }
+
+    setInterval(updatePiRecordingStatus, 1000);
+    setInterval(updateEspRecordingStatus, 1000);
+</script>
+{% endblock %}

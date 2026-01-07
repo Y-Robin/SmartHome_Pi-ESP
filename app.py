@@ -1,6 +1,6 @@
 import os
 import yaml
-from flask import Flask
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 import temperature
@@ -8,7 +8,7 @@ import power
 import led
 import stepper
 from camera_streamer import camera_blueprint
-from streamEsp import streaming_blueprint
+from streamEsp import streaming_blueprint, camera_devices
 from videoLib import videoLib_blueprint
 from robot import robot_blueprint  # Neuer Import
 
@@ -60,6 +60,19 @@ app.register_blueprint(stepper_blueprint)
 app.register_blueprint(streaming_blueprint, url_prefix='/')
 app.register_blueprint(videoLib_blueprint)
 app.register_blueprint(robot_blueprint)  # Registrierung des Roboter-Blueprints
+
+
+@app.route('/videoStreams')
+def video_streams():
+    cam_id = request.args.get('cam_id')
+    selected_cam = cam_id if cam_id in camera_devices else None
+    if not selected_cam and camera_devices:
+        selected_cam = next(iter(camera_devices))
+    return render_template(
+        'video_streams.html',
+        cam_id=selected_cam,
+        cameras=camera_devices,
+    )
 
 
 if __name__ == '__main__':
