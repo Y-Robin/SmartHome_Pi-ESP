@@ -366,16 +366,57 @@ button:active {
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+.stat-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
 .stat-card h3 {
     margin: 0 0 8px;
     font-size: 16px;
     color: #444;
 }
 
-.stat-card p {
+.stat-card .stat-value {
     margin: 0;
     font-size: 20px;
     font-weight: bold;
+}
+
+.stat-card--power {
+    background: linear-gradient(135deg, rgba(255, 99, 132, 0.12), rgba(255, 99, 132, 0.04));
+    border: 1px solid rgba(255, 99, 132, 0.3);
+    text-align: left;
+}
+
+.stat-card--power h3 {
+    margin: 0;
+    color: #9f1239;
+}
+
+.stat-value--power {
+    font-size: 28px;
+    color: #be123c;
+}
+
+.stat-pill {
+    background: rgba(255, 99, 132, 0.15);
+    color: #9f1239;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.stat-subtitle {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--muted);
 }
 
 .temperature-controls {
