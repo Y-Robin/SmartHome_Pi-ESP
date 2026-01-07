@@ -143,6 +143,17 @@ body {
     font-weight: 700;
 }
 
+.weather-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weather-symbol {
+    font-size: 24px;
+    line-height: 1;
+}
+
 .weather-values,
 .forecast {
     display: grid;
