@@ -102,6 +102,12 @@ body {
     margin-bottom: 12px;
 }
 
+.room-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .pill {
     background-color: #e8efff;
     color: #0b6efd;
@@ -125,6 +131,11 @@ body {
 .pill-error {
     background: #fee2e2;
     color: #b91c1c;
+}
+
+.pill-warning {
+    background: #fef3c7;
+    color: #92400e;
 }
 
 .weather-card .label,

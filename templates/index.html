@@ -66,11 +66,24 @@
 {% if has_devices %}
 <section class="rooms">
     {% for room, devices in device_rooms.items() %}
+        {% set ns = namespace(show_shower=false) %}
+        {% if room == 'Bad' %}
+            {% for device in devices %}
+                {% if device.reading and device.reading.humidity is not none and device.reading.humidity > 75 %}
+                    {% set ns.show_shower = true %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
         <article class="card room-card">
             <div class="card-header">
                 <div>
                     <p class="eyebrow">Raum</p>
-                    <h2>{{ room }}</h2>
+                    <div class="room-title">
+                        <h2>{{ room }}</h2>
+                        {% if ns.show_shower %}
+                            <span class="pill pill-warning">Duschen</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <span class="pill">{{ devices|length }} Geräte</span>
             </div>
