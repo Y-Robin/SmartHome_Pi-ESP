@@ -118,14 +118,19 @@ body {
 }
 
 .pill-light {
-    background: #f4f5f7;
-    color: #374151;
+    background-color: #f1f5f9;
+    color: #475569;
 }
 
 .pill-outline {
-    background: transparent;
+    background: white;
+    color: #1e293b;
     border: 1px solid var(--border);
-    color: #111827;
+}
+
+.pill-warning {
+    background: #fff7ed;
+    color: #c2410c;
 }
 
 .pill-error {
@@ -133,167 +138,132 @@ body {
     color: #b91c1c;
 }
 
-.pill-warning {
-    background: #fef3c7;
-    color: #92400e;
-}
-
 .weather-card .label,
 .device-card .label {
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     color: var(--muted);
-    margin: 0 0 4px;
+    margin-bottom: 4px;
 }
 
 .weather-card .value,
 .device-card .value {
     font-size: 20px;
-    margin: 0;
     font-weight: 700;
+}
+
+.weather-card .forecast {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 16px;
 }
 
 .weather-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .weather-icon {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
+    font-size: 14px;
 }
 
 .weather-symbol {
     font-size: 24px;
-    line-height: 1;
-}
-
-.weather-condition {
-    font-size: 12px;
-    color: var(--muted);
-    text-align: center;
-}
-
-.weather-values,
-.forecast {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-}
-
-.weather-values {
-    margin-bottom: 12px;
-}
-
-.rooms {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-top: 24px;
 }
 
 .device-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 300px));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 12px;
-    grid-auto-rows: 1fr;
-    justify-content: start;
-    align-items: stretch;
 }
 
 .device-card {
-    background: #f9fbff;
+    border-radius: 12px;
     border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    height: 100%;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    min-height: 240px;
+    gap: 12px;
+    position: relative;
 }
 
 .device-card.esp {
-    border-top: 3px solid var(--primary);
+    border-left: 4px solid var(--primary);
 }
 
 .device-card.socket {
-    border-top: 3px solid var(--socket);
+    border-left: 4px solid var(--socket);
 }
 
 .device-head {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    gap: 12px;
 }
 
 .device-meta {
     display: flex;
     gap: 6px;
-    align-items: center;
     flex-wrap: wrap;
-    margin-bottom: 4px;
 }
-
-.muted {
-    color: var(--muted);
-    margin: 2px 0 0;
-}
-
-.status-pill {
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 12px;
-    text-transform: uppercase;
-    color: white;
-}
-
-.status-connected { background: var(--success); }
-.status-disconnected { background: #94a3b8; }
-.status-error { background: var(--danger); }
-.status-unknown { background: #9ca3af; }
 
 .status-stack {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 4px;
+    gap: 6px;
+}
+
+.status-pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.status-connected {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.status-disconnected {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-error {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-unknown {
+    background: #e2e8f0;
+    color: #334155;
 }
 
 .status-sub {
     font-size: 12px;
-    margin: 0;
-}
-
-.device-type {
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}
-
-.device-type-esp {
-    background: #e4ecff;
-    color: #1d4ed8;
-}
-
-.device-type-socket {
-    background: #fff7ed;
-    color: #c2410c;
 }
 
 .device-readings {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
-    background: #ffffff;
-    border: 1px dashed var(--border);
-    padding: 10px;
-    border-radius: 8px;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.reading-note {
+    margin: 0;
 }
 
 .control-group {
@@ -369,42 +339,41 @@ button:active {
     margin-bottom: 20px;
 }
 
-.power-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    margin: 8px 0 16px;
+.power-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
 }
 
-.power-meta strong {
-    font-size: 16px;
-    color: #222;
-}
-
-.power-stats .stat-card {
-    border: 1px solid rgba(0, 0, 0, 0.04);
+.power-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
-    background-color: #f8f8f8;
-    border-radius: 6px;
-    padding: 12px;
-    text-align: center;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border);
 }
 
 .stat-card h3 {
-    margin: 0 0 8px;
-    font-size: 16px;
-    color: #444;
+    margin: 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
 }
 
 .stat-card .stat-value {
     margin: 0;
     font-size: 20px;
     font-weight: bold;
+    color: #444;
 }
 
 .stat-card.highlight {
@@ -440,12 +409,22 @@ button:active {
 }
 
 .control-inline input[type="date"],
+.control-field input[type="datetime-local"],
+.control-field input[type="text"],
 .control-field select {
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: #fff;
     font-family: inherit;
+}
+
+.calendar-card {
+    padding: 12px;
+}
+
+.calendar-card #calendar {
+    background: #fff;
 }
 
 .temperature-grid {

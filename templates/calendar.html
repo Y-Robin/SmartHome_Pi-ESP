@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Kalender{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+{% endblock %}
+
+{% block content %}
+    <section class="page-hero">
+        <div>
+            <p class="eyebrow">Übersicht</p>
+            <h1>Kalender</h1>
+            <p class="subhead">Plane Termine und behalte automatisch erkannte Duschen im Blick.</p>
+        </div>
+    </section>
+
+    <section class="card temperature-controls">
+        <div class="control-field">
+            <label for="eventTitle">Titel</label>
+            <input type="text" id="eventTitle" placeholder="Neuer Termin">
+        </div>
+        <div class="control-field">
+            <label for="eventStart">Start</label>
+            <input type="datetime-local" id="eventStart">
+        </div>
+        <div class="control-field">
+            <label for="eventEnd">Ende</label>
+            <input type="datetime-local" id="eventEnd">
+        </div>
+        <div class="control-field">
+            <label>&nbsp;</label>
+            <button type="button" id="createEventButton">Eintrag speichern</button>
+        </div>
+    </section>
+
+    <section class="card calendar-card">
+        <div id="calendar"></div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <script>
+        function toDatetimeLocalValue(date) {
+            if (!date) return '';
+            const offset = date.getTimezoneOffset() * 60000;
+            return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('calendar');
+            const titleInput = document.getElementById('eventTitle');
+            const startInput = document.getElementById('eventStart');
+            const endInput = document.getElementById('eventEnd');
+            const createButton = document.getElementById('createEventButton');
+            let editingEventId = null;
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                locale: 'de',
+                initialView: 'dayGridMonth',
+                navLinks: true,
+                selectable: true,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: '/calendar_events',
+                select: function(info) {
+                    startInput.value = toDatetimeLocalValue(info.start);
+                    endInput.value = toDatetimeLocalValue(info.end);
+                    editingEventId = null;
+                    createButton.textContent = 'Eintrag speichern';
+                },
+                eventClick: function(info) {
+                    if (!info.event.id || !info.event.id.startsWith('user-')) {
+                        return;
+                    }
+
+                    editingEventId = info.event.id;
+                    titleInput.value = info.event.title || '';
+                    startInput.value = toDatetimeLocalValue(info.event.start);
+                    endInput.value = toDatetimeLocalValue(info.event.end);
+                    createButton.textContent = 'Eintrag aktualisieren';
+                }
+            });
+
+            calendar.render();
+
+            createButton.addEventListener('click', function() {
+                const title = titleInput.value.trim();
+                const startValue = startInput.value;
+                const endValue = endInput.value;
+
+                if (!title || !startValue) {
+                    alert('Bitte Titel und Startzeit angeben.');
+                    return;
+                }
+
+                const payload = {
+                    title: title,
+                    start: new Date(startValue).toISOString(),
+                    end: endValue ? new Date(endValue).toISOString() : null
+                };
+
+                const url = editingEventId ? `/calendar_events/${editingEventId}` : '/calendar_events';
+                const method = editingEventId ? 'PATCH' : 'POST';
+
+                fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Fehler beim Speichern.');
+                        }
+                        return response.json();
+                    })
+                    .then(() => {
+                        titleInput.value = '';
+                        endInput.value = '';
+                        editingEventId = null;
+                        createButton.textContent = 'Eintrag speichern';
+                        calendar.refetchEvents();
+                    })
+                    .catch(() => {
+                        alert('Eintrag konnte nicht gespeichert werden.');
+                    });
+            });
+        });
+    </script>
+{% endblock %}
