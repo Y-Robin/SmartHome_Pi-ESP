@@ -16,27 +16,30 @@
             <option value="3600" selected>Last hour</option>
             <option value="86400">Last 24 hours</option>
         </select>
-        <label for="sampleLimit">Max samples:</label>
-        <input id="sampleLimit" type="number" value="1000" min="100" step="100">
         <button id="refreshButton">Load data</button>
     </div>
 
-    <div class="stat-grid">
+    <div class="power-meta">
+        <span>Samples in view:</span>
+        <strong id="sampleCount">0</strong>
+    </div>
+
+    <div class="stat-grid power-stats">
         <div class="stat-card">
             <h3>Voltage</h3>
-            <p id="voltageValue">–</p>
+            <p id="voltageValue" class="stat-value">–</p>
         </div>
         <div class="stat-card">
             <h3>Current</h3>
-            <p id="currentValue">–</p>
+            <p id="currentValue" class="stat-value">–</p>
         </div>
-        <div class="stat-card">
+        <div class="stat-card highlight">
             <h3>Power</h3>
-            <p id="powerValue">–</p>
+            <p id="powerValue" class="stat-value">–</p>
         </div>
         <div class="stat-card">
             <h3>Total Energy</h3>
-            <p id="energyValue">–</p>
+            <p id="energyValue" class="stat-value">–</p>
         </div>
     </div>
 
@@ -139,9 +142,9 @@
         document.getElementById('energyValue').textContent = latest.energy !== null ? `${latest.energy.toFixed(1)} Wh` : '–';
     }
 
-    function trimSamples(durationSeconds, maxSamples) {
+    function trimSamples(durationSeconds) {
         const cutoff = moment().subtract(durationSeconds, 'seconds');
-        samples = samples.filter(sample => moment(sample.timestamp).isAfter(cutoff)).slice(-maxSamples);
+        samples = samples.filter(sample => moment(sample.timestamp).isAfter(cutoff));
     }
 
     function renderChart() {
@@ -155,13 +158,13 @@
 
     async function fetchHistoricalData() {
         const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
-        const maxSamples = parseInt(document.getElementById('sampleLimit').value, 10);
 
-        const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&limit=${maxSamples}&device_id=${selectedDeviceId}`);
+        const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&device_id=${selectedDeviceId}`);
         const data = await response.json();
 
         samples = data.map(sample => ({ ...sample, timestamp: new Date(sample.timestamp) }));
-        trimSamples(durationSeconds, maxSamples);
+        trimSamples(durationSeconds);
+        document.getElementById('sampleCount').textContent = samples.length.toLocaleString();
         renderChart();
         updateStats(samples[samples.length - 1]);
     }
@@ -186,10 +189,10 @@
 
     document.getElementById('refreshButton').addEventListener('click', fetchHistoricalData);
     document.getElementById('timeRange').addEventListener('change', fetchHistoricalData);
-    document.getElementById('sampleLimit').addEventListener('change', fetchHistoricalData);
     document.getElementById('deviceSelector').addEventListener('change', (event) => {
         selectedDeviceId = event.target.value;
         samples = [];
+        document.getElementById('sampleCount').textContent = '0';
         fetchHistoricalData();
     });
 
