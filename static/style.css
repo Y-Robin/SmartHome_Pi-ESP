@@ -432,5 +432,6 @@ button:active {
 
 .chart-card canvas {
     width: 100%;
-    height: clamp(160px, 25vh, 200px);
+    height: auto;
+    max-height: 260px;
 }
