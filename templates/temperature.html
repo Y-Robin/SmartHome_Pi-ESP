@@ -1,25 +1,55 @@
 {% extends "base.html" %}
 
-{% block title %}Home Page{% endblock %}
+{% block title %}Temperatur Historie{% endblock %}
 
 {% block content %}
 
-    <div id="device-selector-container">
-        <label for="deviceSelect">Select Device:</label>
-        <select id="deviceSelect" onchange="updateChartForSelectedDevice()">
-            <!-- Dynamisch per JS befüllt -->
-        </select>
-    </div>
+    <section class="page-hero">
+        <div>
+            <p class="eyebrow">Verlauf</p>
+            <h1>Temperatur Historie</h1>
+            <p class="subhead">Live-Auswertung für Temperatur und Feuchte im direkten Vergleich.</p>
+        </div>
+    </section>
 
-    <div id="date-picker-container">
-        <input type="date" id="selectedDate">
-        <button onclick="loadDataForSelectedDate()">Load Data</button>
-    </div>
+    <section class="card temperature-controls">
+        <div class="control-field">
+            <label for="deviceSelect">Gerät auswählen</label>
+            <select id="deviceSelect" onchange="updateChartForSelectedDevice()">
+                <!-- Dynamisch per JS befüllt -->
+            </select>
+        </div>
+        <div class="control-field">
+            <label for="selectedDate">Datum filtern</label>
+            <div class="control-inline">
+                <input type="date" id="selectedDate">
+                <button onclick="loadDataForSelectedDate()">Daten laden</button>
+            </div>
+        </div>
+    </section>
 
-    <div id="temperature-data-container">
-        <h2>Live Temperature and Humidity Data</h2>
-        <canvas id="temperatureChart" style="width:100%; max-height:400px;"></canvas>
-    </div>
+    <section class="temperature-grid">
+        <div class="card chart-card">
+            <div class="card-header">
+                <div>
+                    <h2>Temperatur</h2>
+                    <p class="muted">In °C</p>
+                </div>
+                <span class="pill">Live</span>
+            </div>
+            <canvas id="temperatureChart"></canvas>
+        </div>
+        <div class="card chart-card">
+            <div class="card-header">
+                <div>
+                    <h2>Feuchte</h2>
+                    <p class="muted">In %</p>
+                </div>
+                <span class="pill pill-light">Live</span>
+            </div>
+            <canvas id="humidityChart"></canvas>
+        </div>
+    </section>
 
 {% endblock %}
 
@@ -28,27 +58,13 @@
         let globalData = [];  // Global variable to store all temperature data
 
 
-        const ctx = document.getElementById('temperatureChart').getContext('2d');
+        const temperatureCtx = document.getElementById('temperatureChart').getContext('2d');
+        const humidityCtx = document.getElementById('humidityChart').getContext('2d');
 
-        let chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Temperature (°C)',
-                    backgroundColor: 'rgb(255, 99, 132)',
-                    borderColor: 'rgb(255, 99, 132)',
-                    data: []
-                }, {
-                    label: 'Humidity (%)',
-                    backgroundColor: 'rgb(54, 162, 235)',
-                    borderColor: 'rgb(54, 162, 235)',
-                    data: []
-                }]
-            },
-        options: {
+        const baseChartOptions = {
             responsive: true,
             maintainAspectRatio: true,
+            aspectRatio: 3.2,
             scales: {
                 x: {
                     type: 'time',
@@ -59,25 +75,55 @@
                 }
             },
             plugins: {
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'xy',
+                        threshold: 10
+                    },
                     zoom: {
-
-                        pan: {
-                            enabled: true,
-                            mode: 'xy',
-                            threshold: 10
+                        wheel: {
+                            enabled: true
                         },
-                        zoom: {
-                            wheel: {
-                                enabled: true
-                            },
-                            pinch: {
-                                enabled: true
-                            },
-                            mode: 'xy'
-                        }
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy'
                     }
                 }
-        }
+            }
+        };
+
+        const temperatureChart = new Chart(temperatureCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperatur (°C)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [],
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: baseChartOptions
+        });
+
+        const humidityChart = new Chart(humidityCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Feuchte (%)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    data: [],
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: baseChartOptions
         });
 
 
@@ -111,10 +157,13 @@
             const humidityData = filteredData.map(record => record.humidity);
             const labels = filteredData.map(record => moment(record.timestamp).format('YYYY-MM-DD HH:mm:ss'));
 
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = temperatureData;
-            chart.data.datasets[1].data = humidityData;
-            chart.update();
+            temperatureChart.data.labels = labels;
+            temperatureChart.data.datasets[0].data = temperatureData;
+            temperatureChart.update();
+
+            humidityChart.data.labels = labels;
+            humidityChart.data.datasets[0].data = humidityData;
+            humidityChart.update();
         }
 
         function updateChartForDate(selectedDate) {
@@ -175,4 +224,3 @@
 
     </script>
 {% endblock %}
-
