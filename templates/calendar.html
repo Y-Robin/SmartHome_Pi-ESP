@@ -54,6 +54,7 @@
             const startInput = document.getElementById('eventStart');
             const endInput = document.getElementById('eventEnd');
             const createButton = document.getElementById('createEventButton');
+            let editingEventId = null;
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 locale: 'de',
@@ -69,6 +70,19 @@
                 select: function(info) {
                     startInput.value = toDatetimeLocalValue(info.start);
                     endInput.value = toDatetimeLocalValue(info.end);
+                    editingEventId = null;
+                    createButton.textContent = 'Eintrag speichern';
+                },
+                eventClick: function(info) {
+                    if (!info.event.id || !info.event.id.startsWith('user-')) {
+                        return;
+                    }
+
+                    editingEventId = info.event.id;
+                    titleInput.value = info.event.title || '';
+                    startInput.value = toDatetimeLocalValue(info.event.start);
+                    endInput.value = toDatetimeLocalValue(info.event.end);
+                    createButton.textContent = 'Eintrag aktualisieren';
                 }
             });
 
@@ -90,8 +104,11 @@
                     end: endValue ? new Date(endValue).toISOString() : null
                 };
 
-                fetch('/calendar_events', {
-                    method: 'POST',
+                const url = editingEventId ? `/calendar_events/${editingEventId}` : '/calendar_events';
+                const method = editingEventId ? 'PATCH' : 'POST';
+
+                fetch(url, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json'
                     },
@@ -106,6 +123,8 @@
                     .then(() => {
                         titleInput.value = '';
                         endInput.value = '';
+                        editingEventId = null;
+                        createButton.textContent = 'Eintrag speichern';
                         calendar.refetchEvents();
                     })
                     .catch(() => {

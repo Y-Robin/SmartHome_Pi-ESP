@@ -72,4 +72,35 @@ def create_calendar_blueprint():
 
         return jsonify(events)
 
+    @calendar_blueprint.route('/calendar_events/<event_id>', methods=['PATCH'])
+    def update_calendar_event(event_id):
+        if not event_id.startswith('user-'):
+            return jsonify({'error': 'Only user events can be edited.'}), 400
+
+        try:
+            raw_id = int(event_id.split('-', 1)[1])
+        except (IndexError, ValueError):
+            return jsonify({'error': 'Invalid event id.'}), 400
+
+        event = CalendarEvent.query.get(raw_id)
+        if not event:
+            return jsonify({'error': 'Event not found.'}), 404
+
+        data = request.get_json() or {}
+        title = (data.get('title') or event.title).strip()
+        start_value = data.get('start')
+        end_value = data.get('end')
+
+        if not title:
+            return jsonify({'error': 'Title is required.'}), 400
+
+        if start_value:
+            event.start_time = _parse_iso_datetime(start_value)
+        if end_value is not None:
+            event.end_time = _parse_iso_datetime(end_value)
+        event.title = title
+
+        db.session.commit()
+        return jsonify({'message': 'Event updated'})
+
     return calendar_blueprint
