@@ -10,7 +10,7 @@ def load_devices_from_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
     with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
-    return list(config.get('devices', {}).keys())
+    return config.get('devices', {})
 
 def create_temperature_blueprint(socketio, db):
     temperature_blueprint = Blueprint('temperature', __name__)
@@ -30,7 +30,14 @@ def create_temperature_blueprint(socketio, db):
     
     @temperature_blueprint.route('/get_available_devices')
     def get_available_devices():
-        device_list = load_devices_from_config()
+        devices = load_devices_from_config()
+        device_list = [
+            {
+                'device_id': device_id,
+                'room': details.get('room')
+            }
+            for device_id, details in devices.items()
+        ]
         return jsonify(device_list)
 
     @temperature_blueprint.route('/record_temperature', methods=['POST'])
