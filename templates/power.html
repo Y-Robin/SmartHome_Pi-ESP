@@ -14,17 +14,24 @@
 <div class="card">
     <h2>Socket Power Monitor</h2>
     <p>Live dashboard for voltage, current, power, and cumulative energy from the Shelly socket.</p>
-    <div class="controls">
-        <label for="deviceSelector">Socket:</label>
-        <select id="deviceSelector"></select>
-        <label for="timeRange">Time window:</label>
-        <select id="timeRange">
-            <option value="300">Last 5 minutes</option>
-            <option value="900">Last 15 minutes</option>
-            <option value="3600" selected>Last hour</option>
-            <option value="86400">Last 24 hours</option>
-        </select>
-        <button id="refreshButton">Load data</button>
+    <div class="temperature-controls">
+        <div class="control-field">
+            <label for="deviceSelector">Socket</label>
+            <select id="deviceSelector"></select>
+        </div>
+        <div class="control-field">
+            <label for="timeRange">Time window</label>
+            <select id="timeRange">
+                <option value="300">Last 5 minutes</option>
+                <option value="900">Last 15 minutes</option>
+                <option value="3600" selected>Last hour</option>
+                <option value="86400">Last 24 hours</option>
+            </select>
+        </div>
+        <div class="control-field">
+            <label>&nbsp;</label>
+            <button id="refreshButton">Load data</button>
+        </div>
     </div>
 
     <div class="power-meta">

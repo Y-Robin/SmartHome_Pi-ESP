@@ -144,8 +144,8 @@
 
                 const payload = {
                     title: title,
-                    start: new Date(startValue).toISOString(),
-                    end: endValue ? new Date(endValue).toISOString() : null
+                    start: startValue,
+                    end: endValue || null
                 };
 
                 const url = editingEventId ? `/calendar_events/${editingEventId}` : '/calendar_events';
