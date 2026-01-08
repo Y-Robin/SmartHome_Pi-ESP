@@ -36,6 +36,7 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="button-secondary" id="deleteEventButton">Eintrag löschen</button>
                 <button type="button" class="button-secondary" id="cancelEventButton">Abbrechen</button>
                 <button type="button" id="saveEventButton">Eintrag speichern</button>
             </div>
@@ -62,11 +63,14 @@
             const startInput = document.getElementById('eventStart');
             const endInput = document.getElementById('eventEnd');
             const saveButton = document.getElementById('saveEventButton');
+            const deleteButton = document.getElementById('deleteEventButton');
             const modalBackdrop = document.getElementById('eventModalBackdrop');
             const modalTitle = document.getElementById('eventModalTitle');
             const closeModalButton = document.getElementById('closeEventModal');
             const cancelModalButton = document.getElementById('cancelEventButton');
             let editingEventId = null;
+            let editingEventType = null;
+            deleteButton.style.display = 'none';
 
             function openModal() {
                 modalBackdrop.classList.add('is-open');
@@ -80,23 +84,29 @@
 
             function openNewEvent(date) {
                 editingEventId = null;
+                editingEventType = 'user';
                 titleInput.value = '';
+                titleInput.disabled = false;
                 const startDate = new Date(date);
                 const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
                 startInput.value = toDatetimeLocalValue(startDate);
                 endInput.value = toDatetimeLocalValue(endDate);
                 modalTitle.textContent = 'Termin hinzufügen';
                 saveButton.textContent = 'Eintrag speichern';
+                deleteButton.style.display = 'none';
                 openModal();
             }
 
             function openEditEvent(event) {
                 editingEventId = event.id;
+                editingEventType = event.extendedProps.type || 'user';
                 titleInput.value = event.title || '';
                 startInput.value = toDatetimeLocalValue(event.start);
                 endInput.value = toDatetimeLocalValue(event.end);
-                modalTitle.textContent = 'Termin bearbeiten';
+                titleInput.disabled = editingEventType === 'shower';
+                modalTitle.textContent = editingEventType === 'shower' ? 'Duschen bearbeiten' : 'Termin bearbeiten';
                 saveButton.textContent = 'Eintrag aktualisieren';
+                deleteButton.style.display = 'inline-flex';
                 openModal();
             }
 
@@ -114,7 +124,7 @@
                     openNewEvent(info.date);
                 },
                 eventClick: function(info) {
-                    if (!info.event.id || !info.event.id.startsWith('user-')) {
+                    if (!info.event.id) {
                         return;
                     }
 
@@ -137,16 +147,19 @@
                 const startValue = startInput.value;
                 const endValue = endInput.value;
 
-                if (!title || !startValue) {
+                if ((!title && editingEventType !== 'shower') || !startValue) {
                     alert('Bitte Titel und Startzeit angeben.');
                     return;
                 }
 
                 const payload = {
-                    title: title,
                     start: startValue,
                     end: endValue || null
                 };
+
+                if (editingEventType !== 'shower') {
+                    payload.title = title;
+                }
 
                 const url = editingEventId ? `/calendar_events/${editingEventId}` : '/calendar_events';
                 const method = editingEventId ? 'PATCH' : 'POST';
@@ -173,6 +186,33 @@
                     })
                     .catch(() => {
                         alert('Eintrag konnte nicht gespeichert werden.');
+                    });
+            });
+
+            deleteButton.addEventListener('click', function() {
+                if (!editingEventId) {
+                    return;
+                }
+
+                fetch(`/calendar_events/${editingEventId}`, {
+                    method: 'DELETE'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Fehler beim Löschen.');
+                        }
+                        return response.json();
+                    })
+                    .then(() => {
+                        titleInput.value = '';
+                        endInput.value = '';
+                        editingEventId = null;
+                        editingEventType = null;
+                        closeModal();
+                        calendar.refetchEvents();
+                    })
+                    .catch(() => {
+                        alert('Eintrag konnte nicht gelöscht werden.');
                     });
             });
         });
