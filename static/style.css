@@ -438,6 +438,24 @@ button:active {
     background: #fff;
 }
 
+.calendar-card .fc .fc-daygrid-event,
+.calendar-card .fc .fc-timegrid-event {
+    height: auto;
+}
+
+.calendar-card .fc .fc-event-title {
+    white-space: normal;
+    overflow: visible;
+}
+
+.calendar-card .fc .fc-daygrid-event {
+    align-items: flex-start;
+}
+
+.calendar-card .fc .fc-event-main {
+    padding: 4px 6px;
+}
+
 .temperature-grid {
     display: grid;
     grid-template-columns: 1fr;
