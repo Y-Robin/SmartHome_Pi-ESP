@@ -35,6 +35,14 @@
     }
 </style>
 
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Motor</p>
+        <h1>Stepper Control</h1>
+        <p class="subhead">Steuere Winkel, prüfe den aktuellen Status und wechsle zwischen Geräten.</p>
+    </div>
+</section>
+
 <div class="page-container">
     <div class="sidebar">
         <h3>Stepper Geräte</h3>
@@ -46,7 +54,7 @@
     </div>
 
     <div class="stepper-control">
-        <h1>Stepper Motor: {{ device_id }}</h1>
+        <h2>Stepper Motor: {{ device_id }}</h2>
         <input type="range" id="angleSlider" min="0" max="360" value="0" oninput="updateAngleValue(this.value)">
         <span id="angleValue">0</span>°
         <br><br>

@@ -15,24 +15,32 @@
         </div>
     </section>
 
-    <section class="card temperature-controls">
-        <div class="control-field">
-            <label for="eventTitle">Titel</label>
-            <input type="text" id="eventTitle" placeholder="Neuer Termin">
+    <div class="modal-backdrop" id="eventModalBackdrop" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+            <div class="modal-header">
+                <h2 id="eventModalTitle">Termin hinzufügen</h2>
+                <button type="button" class="modal-close" id="closeEventModal" aria-label="Schließen">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="control-field">
+                    <label for="eventTitle">Titel</label>
+                    <input type="text" id="eventTitle" placeholder="Neuer Termin">
+                </div>
+                <div class="control-field">
+                    <label for="eventStart">Start</label>
+                    <input type="datetime-local" id="eventStart">
+                </div>
+                <div class="control-field">
+                    <label for="eventEnd">Ende</label>
+                    <input type="datetime-local" id="eventEnd">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button-secondary" id="cancelEventButton">Abbrechen</button>
+                <button type="button" id="saveEventButton">Eintrag speichern</button>
+            </div>
         </div>
-        <div class="control-field">
-            <label for="eventStart">Start</label>
-            <input type="datetime-local" id="eventStart">
-        </div>
-        <div class="control-field">
-            <label for="eventEnd">Ende</label>
-            <input type="datetime-local" id="eventEnd">
-        </div>
-        <div class="control-field">
-            <label>&nbsp;</label>
-            <button type="button" id="createEventButton">Eintrag speichern</button>
-        </div>
-    </section>
+    </div>
 
     <section class="card calendar-card">
         <div id="calendar"></div>
@@ -53,42 +61,78 @@
             const titleInput = document.getElementById('eventTitle');
             const startInput = document.getElementById('eventStart');
             const endInput = document.getElementById('eventEnd');
-            const createButton = document.getElementById('createEventButton');
+            const saveButton = document.getElementById('saveEventButton');
+            const modalBackdrop = document.getElementById('eventModalBackdrop');
+            const modalTitle = document.getElementById('eventModalTitle');
+            const closeModalButton = document.getElementById('closeEventModal');
+            const cancelModalButton = document.getElementById('cancelEventButton');
             let editingEventId = null;
+
+            function openModal() {
+                modalBackdrop.classList.add('is-open');
+                modalBackdrop.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                modalBackdrop.classList.remove('is-open');
+                modalBackdrop.setAttribute('aria-hidden', 'true');
+            }
+
+            function openNewEvent(date) {
+                editingEventId = null;
+                titleInput.value = '';
+                const startDate = new Date(date);
+                const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+                startInput.value = toDatetimeLocalValue(startDate);
+                endInput.value = toDatetimeLocalValue(endDate);
+                modalTitle.textContent = 'Termin hinzufügen';
+                saveButton.textContent = 'Eintrag speichern';
+                openModal();
+            }
+
+            function openEditEvent(event) {
+                editingEventId = event.id;
+                titleInput.value = event.title || '';
+                startInput.value = toDatetimeLocalValue(event.start);
+                endInput.value = toDatetimeLocalValue(event.end);
+                modalTitle.textContent = 'Termin bearbeiten';
+                saveButton.textContent = 'Eintrag aktualisieren';
+                openModal();
+            }
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 locale: 'de',
                 initialView: 'dayGridMonth',
                 navLinks: true,
-                selectable: true,
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 },
                 events: '/calendar_events',
-                select: function(info) {
-                    startInput.value = toDatetimeLocalValue(info.start);
-                    endInput.value = toDatetimeLocalValue(info.end);
-                    editingEventId = null;
-                    createButton.textContent = 'Eintrag speichern';
+                dateClick: function(info) {
+                    openNewEvent(info.date);
                 },
                 eventClick: function(info) {
                     if (!info.event.id || !info.event.id.startsWith('user-')) {
                         return;
                     }
 
-                    editingEventId = info.event.id;
-                    titleInput.value = info.event.title || '';
-                    startInput.value = toDatetimeLocalValue(info.event.start);
-                    endInput.value = toDatetimeLocalValue(info.event.end);
-                    createButton.textContent = 'Eintrag aktualisieren';
+                    openEditEvent(info.event);
                 }
             });
 
             calendar.render();
 
-            createButton.addEventListener('click', function() {
+            closeModalButton.addEventListener('click', closeModal);
+            cancelModalButton.addEventListener('click', closeModal);
+            modalBackdrop.addEventListener('click', function(event) {
+                if (event.target === modalBackdrop) {
+                    closeModal();
+                }
+            });
+
+            saveButton.addEventListener('click', function() {
                 const title = titleInput.value.trim();
                 const startValue = startInput.value;
                 const endValue = endInput.value;
@@ -100,8 +144,8 @@
 
                 const payload = {
                     title: title,
-                    start: new Date(startValue).toISOString(),
-                    end: endValue ? new Date(endValue).toISOString() : null
+                    start: startValue,
+                    end: endValue || null
                 };
 
                 const url = editingEventId ? `/calendar_events/${editingEventId}` : '/calendar_events';
@@ -124,7 +168,7 @@
                         titleInput.value = '';
                         endInput.value = '';
                         editingEventId = null;
-                        createButton.textContent = 'Eintrag speichern';
+                        closeModal();
                         calendar.refetchEvents();
                     })
                     .catch(() => {
