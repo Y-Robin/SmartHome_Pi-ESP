@@ -30,6 +30,14 @@
     }
 </style>
 
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Live</p>
+        <h1>ESP Kamera Stream</h1>
+        <p class="subhead">Wähle eine Kamera aus, justiere das LED-Licht und starte Aufnahmen.</p>
+    </div>
+</section>
+
 <div class="page-container">
     <div class="sidebar">
         <h3>Kameras</h3>
@@ -41,7 +49,7 @@
     </div>
 
     <div class="camera-container">
-        <h1>Stream von {{ cam_id }}</h1>
+        <h2>Stream von {{ cam_id }}</h2>
         <img id="streamEsp" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" alt="Camera Stream">
 
         <div class="slider-container">

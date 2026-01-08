@@ -179,8 +179,9 @@ body {
 
 .device-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 240px));
     gap: 12px;
+    justify-content: flex-start;
 }
 
 .device-card {
@@ -321,6 +322,16 @@ button:active {
     transform: translateY(1px);
 }
 
+.button-secondary {
+    background: #f1f5f9;
+    color: #1f2937;
+    border: 1px solid var(--border);
+}
+
+.button-secondary:hover {
+    background: #e2e8f0;
+}
+
 .element-list {
     display: flex;
     flex-wrap: wrap;
@@ -431,6 +442,62 @@ button:active {
     display: grid;
     grid-template-columns: 1fr;
     gap: 16px;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.modal-backdrop.is-open {
+    display: flex;
+}
+
+.modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    width: min(520px, 100%);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.modal-body {
+    display: grid;
+    gap: 12px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .chart-card h2 {

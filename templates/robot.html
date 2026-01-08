@@ -56,6 +56,14 @@
     }
 </style>
 
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Steuerung</p>
+        <h1>Roboter</h1>
+        <p class="subhead">Wähle einen Roboter aus und sende Fahrbefehle mit dem Joystick.</p>
+    </div>
+</section>
+
 <div class="page-container">
     <div class="sidebar">
         <h3>Roboter</h3>
@@ -67,7 +75,7 @@
     </div>
 
     <div class="robot-control">
-        <h1>Roboter: {{ device_id }}</h1>
+        <h2>Roboter: {{ device_id }}</h2>
         <img id="robotStream" src="{{ url_for('streaming.stream_img', cam_id=cam_id) }}" width="640" alt="Live-Stream vom Roboter">
         <p>Bewege den Joystick, um Fahrbefehle zu senden.</p>
         <div id="joystick-container">
