@@ -1,6 +1,7 @@
 import os
 import yaml
 from flask import Flask, render_template, request
+from sqlalchemy import event
 from flask_socketio import SocketIO
 import temperature
 import power
@@ -17,8 +18,26 @@ from extensions import db
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {
+        'timeout': 30,
+        'check_same_thread': False,
+    }
+}
 db.init_app(app)
 socketio = SocketIO(app)
+
+
+def _set_sqlite_pragma(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute('PRAGMA journal_mode=WAL;')
+    cursor.execute('PRAGMA synchronous=NORMAL;')
+    cursor.execute('PRAGMA busy_timeout=5000;')
+    cursor.close()
+
+
+with app.app_context():
+    event.listen(db.engine, 'connect', _set_sqlite_pragma)
 
 
 def _load_power_devices_from_config():
