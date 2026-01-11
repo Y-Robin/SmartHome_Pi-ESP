@@ -1,6 +1,7 @@
 import os
 import yaml
 from flask import Flask, render_template, request
+from sqlalchemy import event
 from flask_socketio import SocketIO
 import temperature
 import power
@@ -11,13 +12,32 @@ from streamEsp import streaming_blueprint, camera_devices
 from videoLib import videoLib_blueprint
 from robot import robot_blueprint  # Neuer Import
 from calendar_routes import create_calendar_blueprint
+from games import games_blueprint
 from extensions import db
 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {
+        'timeout': 30,
+        'check_same_thread': False,
+    }
+}
 db.init_app(app)
 socketio = SocketIO(app)
+
+
+def _set_sqlite_pragma(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute('PRAGMA journal_mode=WAL;')
+    cursor.execute('PRAGMA synchronous=NORMAL;')
+    cursor.execute('PRAGMA busy_timeout=5000;')
+    cursor.close()
+
+
+with app.app_context():
+    event.listen(db.engine, 'connect', _set_sqlite_pragma)
 
 
 def _load_power_devices_from_config():
@@ -63,6 +83,7 @@ app.register_blueprint(streaming_blueprint, url_prefix='/')
 app.register_blueprint(videoLib_blueprint)
 app.register_blueprint(robot_blueprint)  # Registrierung des Roboter-Blueprints
 app.register_blueprint(calendar_blueprint)
+app.register_blueprint(games_blueprint)
 
 
 @app.route('/videoStreams')
