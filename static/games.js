@@ -167,6 +167,15 @@
         updateScore();
         resetAfterGameOver();
         setStatus('Game Over! Trage deinen Namen ein und speichere den Score.');
+        if (lastScore > 0) {
+            const enteredName = window.prompt('Game Over! Bitte trage deinen Namen ein:', playerInput.value || '');
+            if (enteredName !== null) {
+                playerInput.value = enteredName.trim();
+                if (playerInput.value) {
+                    playerInput.focus();
+                }
+            }
+        }
     };
 
     const applyDirection = (newDirection) => {
