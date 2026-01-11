@@ -20,18 +20,13 @@
     <div class="card">
         <div class="card-header">
             <h2>Snake</h2>
-            <span class="pill">Pfeiltasten / WASD</span>
+            <span class="pill">WASD + Joystick</span>
         </div>
         <div class="snake-layout">
             <div class="snake-board">
                 <canvas id="snake-canvas" width="400" height="400" aria-label="Snake Spielfeld"></canvas>
-                <div class="snake-touch-controls" aria-label="Touch Steuerung">
-                    <button class="snake-touch-button" type="button" data-direction="up">▲</button>
-                    <div class="snake-touch-row">
-                        <button class="snake-touch-button" type="button" data-direction="left">◀</button>
-                        <button class="snake-touch-button" type="button" data-direction="down">▼</button>
-                        <button class="snake-touch-button" type="button" data-direction="right">▶</button>
-                    </div>
+                <div class="snake-joystick" id="snake-joystick" aria-label="Touch Joystick">
+                    <div class="snake-joystick-handle" id="snake-joystick-handle"></div>
                 </div>
                 <div class="snake-score-box">
                     <p class="label">Aktueller Score</p>

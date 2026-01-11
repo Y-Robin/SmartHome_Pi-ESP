@@ -195,24 +195,75 @@
 
     const handleKeydown = (event) => {
         const key = event.key.toLowerCase();
-        if (key === 'arrowup' || key === 'w') {
+        if (key === 'w') {
             applyDirection('up');
-        } else if (key === 'arrowdown' || key === 's') {
+        } else if (key === 's') {
             applyDirection('down');
-        } else if (key === 'arrowleft' || key === 'a') {
+        } else if (key === 'a') {
             applyDirection('left');
-        } else if (key === 'arrowright' || key === 'd') {
+        } else if (key === 'd') {
             applyDirection('right');
         }
     };
 
-    const handleTouchInput = (event) => {
-        event.preventDefault();
-        const button = event.currentTarget;
-        const directionValue = button.dataset.direction;
-        if (directionValue) {
-            applyDirection(directionValue);
+    const joystick = document.getElementById('snake-joystick');
+    const joystickHandle = document.getElementById('snake-joystick-handle');
+    const joystickState = {
+        active: false,
+        centerX: 0,
+        centerY: 0,
+        radius: 0,
+    };
+
+    const updateJoystick = (clientX, clientY) => {
+        const dx = clientX - joystickState.centerX;
+        const dy = clientY - joystickState.centerY;
+        const distance = Math.hypot(dx, dy);
+        const maxDistance = joystickState.radius;
+        const limitedDistance = Math.min(distance, maxDistance);
+        const angle = Math.atan2(dy, dx);
+        const offsetX = Math.cos(angle) * limitedDistance;
+        const offsetY = Math.sin(angle) * limitedDistance;
+        joystickHandle.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+        if (distance < maxDistance * 0.35) {
+            return;
         }
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            applyDirection(dx > 0 ? 'right' : 'left');
+        } else {
+            applyDirection(dy > 0 ? 'down' : 'up');
+        }
+    };
+
+    const resetJoystick = () => {
+        joystickHandle.style.transform = 'translate(0, 0)';
+    };
+
+    const handleJoystickStart = (event) => {
+        if (!joystick || !joystickHandle) {
+            return;
+        }
+        joystickState.active = true;
+        joystick.setPointerCapture(event.pointerId);
+        const rect = joystick.getBoundingClientRect();
+        joystickState.centerX = rect.left + rect.width / 2;
+        joystickState.centerY = rect.top + rect.height / 2;
+        joystickState.radius = rect.width / 2 - 12;
+        updateJoystick(event.clientX, event.clientY);
+    };
+
+    const handleJoystickMove = (event) => {
+        if (!joystickState.active) {
+            return;
+        }
+        updateJoystick(event.clientX, event.clientY);
+    };
+
+    const handleJoystickEnd = () => {
+        joystickState.active = false;
+        resetJoystick();
     };
 
     const renderHighscores = (scores) => {
@@ -251,10 +302,13 @@
     };
 
     document.addEventListener('keydown', handleKeydown);
-    document.querySelectorAll('.snake-touch-button').forEach(button => {
-        button.addEventListener('touchstart', handleTouchInput, { passive: false });
-        button.addEventListener('click', handleTouchInput);
-    });
+    if (joystick) {
+        joystick.addEventListener('pointerdown', handleJoystickStart);
+        joystick.addEventListener('pointermove', handleJoystickMove);
+        joystick.addEventListener('pointerup', handleJoystickEnd);
+        joystick.addEventListener('pointercancel', handleJoystickEnd);
+        joystick.addEventListener('pointerleave', handleJoystickEnd);
+    }
 
     resetGame();
 })();
