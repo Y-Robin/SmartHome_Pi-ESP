@@ -23,11 +23,6 @@
 
     const statusEl = document.getElementById('snake-status');
     const scoreEl = document.getElementById('snake-score');
-    const startButton = document.getElementById('snake-start');
-    const resetButton = document.getElementById('snake-reset');
-    const submitButton = document.getElementById('snake-submit');
-    const submitStatus = document.getElementById('snake-submit-status');
-    const playerInput = document.getElementById('snake-player');
     const highscoreList = document.getElementById('snake-highscore-list');
 
     let snake = [];
@@ -82,7 +77,6 @@
         updateScore();
         placeFood();
         setStatus('Bereit zum Spielen.');
-        submitStatus.textContent = '';
         if (intervalId) {
             clearInterval(intervalId);
             intervalId = null;
@@ -166,13 +160,13 @@
         score = 0;
         updateScore();
         resetAfterGameOver();
-        setStatus('Game Over! Trage deinen Namen ein und speichere den Score.');
+        setStatus('Game Over! Trage deinen Namen ein, um den Score zu speichern.');
         if (lastScore > 0) {
-            const enteredName = window.prompt('Game Over! Bitte trage deinen Namen ein:', playerInput.value || '');
+            const enteredName = window.prompt('Game Over! Bitte trage deinen Namen ein:', '');
             if (enteredName !== null) {
-                playerInput.value = enteredName.trim();
-                if (playerInput.value) {
-                    playerInput.focus();
+                const trimmedName = enteredName.trim();
+                if (trimmedName) {
+                    submitScore(trimmedName, lastScore);
                 }
             }
         }
@@ -192,6 +186,10 @@
             nextDirection = { x: -1, y: 0 };
         } else if (newDirection === 'right' && !goingLeft) {
             nextDirection = { x: 1, y: 0 };
+        }
+
+        if (!isRunning) {
+            startGame();
         }
     };
 
@@ -230,43 +228,28 @@
         });
     };
 
-    const submitScore = async () => {
-        submitStatus.textContent = '';
-        const playerName = playerInput.value.trim();
-        if (!playerName) {
-            submitStatus.textContent = 'Bitte einen Namen eingeben.';
-            return;
-        }
-        if (lastScore <= 0) {
-            submitStatus.textContent = 'Erreiche zuerst einen Score > 0.';
-            return;
-        }
-
+    const submitScore = async (playerName, scoreValue) => {
         try {
             const response = await fetch('/games/snake/score', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ name: playerName, score: lastScore }),
+                body: JSON.stringify({ name: playerName, score: scoreValue }),
             });
 
             const payload = await response.json();
             if (!response.ok) {
-                submitStatus.textContent = payload.error || 'Fehler beim Speichern.';
+                setStatus(payload.error || 'Fehler beim Speichern.');
                 return;
             }
             renderHighscores(payload.scores || []);
-            submitStatus.textContent = 'Score gespeichert!';
             lastScore = 0;
         } catch (error) {
-            submitStatus.textContent = 'Netzwerkfehler beim Speichern.';
+            setStatus('Netzwerkfehler beim Speichern des Scores.');
         }
     };
 
-    startButton.addEventListener('click', startGame);
-    resetButton.addEventListener('click', resetGame);
-    submitButton.addEventListener('click', submitScore);
     document.addEventListener('keydown', handleKeydown);
     document.querySelectorAll('.snake-touch-button').forEach(button => {
         button.addEventListener('touchstart', handleTouchInput, { passive: false });

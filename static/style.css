@@ -237,7 +237,7 @@ body {
 
 .snake-layout {
     display: grid;
-    grid-template-columns: minmax(260px, 1.2fr) minmax(200px, 0.8fr);
+    grid-template-columns: 1fr;
     gap: 20px;
     align-items: start;
 }
@@ -253,31 +253,8 @@ body {
     border: 1px solid var(--border);
     background: #e5e7eb;
     width: 100%;
-    max-width: 420px;
+    max-width: none;
     height: auto;
-}
-
-.snake-controls {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.snake-controls button,
-.snake-form button {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.snake-controls .pill-outline {
-    background: white;
-    color: #0f172a;
-    border: 1px solid var(--border);
 }
 
 .snake-status {
@@ -310,27 +287,9 @@ body {
     box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
-.snake-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
 .snake-score-box .value {
     font-size: 28px;
     margin: 0;
-}
-
-.snake-form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.snake-form input {
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
 }
 
 .snake-highscores ol {

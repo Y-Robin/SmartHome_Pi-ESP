@@ -25,10 +25,6 @@
         <div class="snake-layout">
             <div class="snake-board">
                 <canvas id="snake-canvas" width="400" height="400" aria-label="Snake Spielfeld"></canvas>
-                <div class="snake-controls">
-                    <button id="snake-start" type="button">Spiel starten</button>
-                    <button id="snake-reset" type="button" class="pill-outline">Neu starten</button>
-                </div>
                 <div class="snake-touch-controls" aria-label="Touch Steuerung">
                     <button class="snake-touch-button" type="button" data-direction="up">▲</button>
                     <div class="snake-touch-row">
@@ -37,19 +33,11 @@
                         <button class="snake-touch-button" type="button" data-direction="right">▶</button>
                     </div>
                 </div>
-                <p id="snake-status" class="snake-status">Bereit zum Spielen.</p>
-            </div>
-            <div class="snake-sidebar">
                 <div class="snake-score-box">
                     <p class="label">Aktueller Score</p>
                     <p id="snake-score" class="value">0</p>
                 </div>
-                <div class="snake-form">
-                    <label for="snake-player">Name für Highscore</label>
-                    <input id="snake-player" type="text" maxlength="80" placeholder="Dein Name">
-                    <button id="snake-submit" type="button">Score speichern</button>
-                    <p id="snake-submit-status" class="snake-status"></p>
-                </div>
+                <p id="snake-status" class="snake-status">Bereit zum Spielen.</p>
                 <div class="snake-highscores">
                     <h3>Top 5</h3>
                     <ol id="snake-highscore-list">
