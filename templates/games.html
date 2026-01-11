@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Spiele{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div>
+        <p class="eyebrow">Freizeitbereich</p>
+        <h1>Spiele</h1>
+        <p class="subhead">Wähle ein Spiel aus und spiele direkt im Browser.</p>
+    </div>
+</div>
+
+<div class="games-tabs">
+    <button class="games-tab active" type="button" data-game="snake">Snake</button>
+    <button class="games-tab" type="button" data-game="coming-soon" disabled>Mehr folgt</button>
+</div>
+
+<section class="games-section active" id="snake-section">
+    <div class="card">
+        <div class="card-header">
+            <h2>Snake</h2>
+            <span class="pill">Pfeiltasten / WASD</span>
+        </div>
+        <div class="snake-layout">
+            <div class="snake-board">
+                <canvas id="snake-canvas" width="400" height="400" aria-label="Snake Spielfeld"></canvas>
+                <div class="snake-controls">
+                    <button id="snake-start" type="button">Spiel starten</button>
+                    <button id="snake-reset" type="button" class="pill-outline">Neu starten</button>
+                </div>
+                <div class="snake-touch-controls" aria-label="Touch Steuerung">
+                    <button class="snake-touch-button" type="button" data-direction="up">▲</button>
+                    <div class="snake-touch-row">
+                        <button class="snake-touch-button" type="button" data-direction="left">◀</button>
+                        <button class="snake-touch-button" type="button" data-direction="down">▼</button>
+                        <button class="snake-touch-button" type="button" data-direction="right">▶</button>
+                    </div>
+                </div>
+                <p id="snake-status" class="snake-status">Bereit zum Spielen.</p>
+            </div>
+            <div class="snake-sidebar">
+                <div class="snake-score-box">
+                    <p class="label">Aktueller Score</p>
+                    <p id="snake-score" class="value">0</p>
+                </div>
+                <div class="snake-form">
+                    <label for="snake-player">Name für Highscore</label>
+                    <input id="snake-player" type="text" maxlength="80" placeholder="Dein Name">
+                    <button id="snake-submit" type="button">Score speichern</button>
+                    <p id="snake-submit-status" class="snake-status"></p>
+                </div>
+                <div class="snake-highscores">
+                    <h3>Top 5</h3>
+                    <ol id="snake-highscore-list">
+                        {% if top_scores %}
+                            {% for score in top_scores %}
+                                <li><strong>{{ score.player_name }}</strong> – {{ score.score }}</li>
+                            {% endfor %}
+                        {% else %}
+                            <li>Noch keine Scores.</li>
+                        {% endif %}
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="games-section" id="coming-soon-section">
+    <div class="card">
+        <div class="card-header">
+            <h2>Weitere Spiele</h2>
+            <span class="pill pill-outline">In Arbeit</span>
+        </div>
+        <p>Hier erscheinen bald weitere Mini-Games.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='games.js') }}"></script>
+{% endblock %}
