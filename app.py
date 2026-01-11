@@ -11,6 +11,7 @@ from streamEsp import streaming_blueprint, camera_devices
 from videoLib import videoLib_blueprint
 from robot import robot_blueprint  # Neuer Import
 from calendar_routes import create_calendar_blueprint
+from games import games_blueprint
 from extensions import db
 
 
@@ -63,6 +64,7 @@ app.register_blueprint(streaming_blueprint, url_prefix='/')
 app.register_blueprint(videoLib_blueprint)
 app.register_blueprint(robot_blueprint)  # Registrierung des Roboter-Blueprints
 app.register_blueprint(calendar_blueprint)
+app.register_blueprint(games_blueprint)
 
 
 @app.route('/videoStreams')
