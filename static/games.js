@@ -91,6 +91,23 @@
         draw();
     };
 
+    const resetAfterGameOver = () => {
+        snake = [
+            { x: 7, y: 10 },
+            { x: 6, y: 10 },
+            { x: 5, y: 10 },
+        ];
+        direction = { x: 1, y: 0 };
+        nextDirection = { x: 1, y: 0 };
+        placeFood();
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        isRunning = false;
+        draw();
+    };
+
     const draw = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#e5e7eb';
@@ -148,6 +165,7 @@
         lastScore = score;
         score = 0;
         updateScore();
+        resetAfterGameOver();
         setStatus('Game Over! Trage deinen Namen ein und speichere den Score.');
     };
 
