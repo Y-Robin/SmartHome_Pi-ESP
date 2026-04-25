@@ -162,16 +162,6 @@
         samples = samples.filter(sample => moment(sample.timestamp).isAfter(cutoff));
     }
 
-
-    function addLiveSample(sample) {
-        const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
-        samples.push(sample);
-        trimSamples(durationSeconds);
-        document.getElementById('sampleCount').textContent = samples.length.toLocaleString();
-        renderChart();
-        updateStats(sample);
-    }
-
     function renderChart() {
         if (!powerChart) return;
         powerChart.data.labels = samples.map(sample => sample.timestamp);
@@ -222,27 +212,18 @@
     });
 
     socket.on('power_sample', sample => {
-        if (!selectedDeviceId && sample.device_id) {
-            selectedDeviceId = sample.device_id;
-            const selector = document.getElementById('deviceSelector');
-            if (selector && selector.value !== selectedDeviceId) {
-                selector.value = selectedDeviceId;
-            }
-        }
-
+        console.log("Selected:", selectedDeviceId, "Sample:", sample);
         if (sample.device_id === selectedDeviceId) {
             const normalized = { ...sample, timestamp: new Date(sample.timestamp) };
-            addLiveSample(normalized);
+            updateStats(normalized);
         }
     });
 
     document.addEventListener('DOMContentLoaded', () => {
         buildChart();
-        loadDevices()
-            .then(() => fetchHistoricalData())
-            .catch((error) => {
-                console.error('Power Monitor init failed', error);
-            });
+        loadDevices().then(() => {
+            fetchHistoricalData();
+        });
     });
 </script>
 {% endblock %}
