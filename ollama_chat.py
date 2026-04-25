@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://192.168.178.41:11434').rstrip('/')
 REQUEST_TIMEOUT_SECONDS = 35
+MODEL_REQUEST_TIMEOUT_SECONDS = 6
 CHAT_DB_PATH = Path(__file__).resolve().parent / 'ollama_chat.db'
 MODEL_CACHE_SECONDS = 45
 MAX_CONTEXT_MESSAGES = 30
@@ -69,7 +70,7 @@ def _fetch_ollama_models(force_refresh=False):
     if not force_refresh and _model_cache['models'] and now < _model_cache['expires_at']:
         return _model_cache['models']
 
-    response = requests.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=REQUEST_TIMEOUT_SECONDS)
+    response = requests.get(f'{OLLAMA_BASE_URL}/api/tags', timeout=MODEL_REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()
     payload = response.json() or {}
     models = [model.get('name') for model in payload.get('models', []) if model.get('name')]
@@ -194,6 +195,9 @@ def create_chat_session():
 
 @ollama_chat_blueprint.route('/ollama-chat/api/sessions/<int:session_id>/messages', methods=['GET'])
 def list_session_messages(session_id):
+    limit = request.args.get('limit', default=120, type=int)
+    limit = max(20, min(limit or 120, 400))
+
     with _get_conn() as conn:
         session = _session_with_preview(conn, session_id)
         if not session:
@@ -205,9 +209,9 @@ def list_session_messages(session_id):
             FROM chat_messages
             WHERE session_id = ?
             ORDER BY id ASC
-            LIMIT 300
+            LIMIT ?
             ''',
-            (session_id,),
+            (session_id, limit),
         ).fetchall()
 
         return jsonify({

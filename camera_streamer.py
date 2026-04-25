@@ -2,6 +2,7 @@ import io
 import os
 import threading
 import datetime
+import time
 
 import numpy as np
 import cv2
@@ -18,10 +19,10 @@ TFLITE_MODEL_PATH = os.path.join(os.path.dirname(__file__), "movenet_singlepose_
 KEYPOINT_SCORE_THRES = 0.3
 INPUT_SIZE = 192
 
-interpreter = tflite.Interpreter(model_path=TFLITE_MODEL_PATH, num_threads=2)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+interpreter = None
+input_details = None
+output_details = None
+interpreter_lock = threading.Lock()
 
 _SKELETON_EDGES = [
     (0, 1), (0, 2), (1, 3), (2, 4),
@@ -37,6 +38,10 @@ recording = False
 FRAMES_BUFFER: List[np.ndarray] = []
 landmark_detection_enabled = False
 lock = threading.Lock()
+camera_thread = None
+CAMERA_IDLE_TIMEOUT_SECONDS = 30
+stream_clients = 0
+last_stream_activity_ts = 0.0
 
 RECORD_FLAG_FILE = 'record_flag.txt'
 VIDEOS_FOLDER = 'static/videos'
@@ -59,6 +64,14 @@ def save_video(frames: List[np.ndarray], file_path: str, fps: int = 20):
 
 
 def _movenet_detect_landmarks(rgb_img: np.ndarray) -> np.ndarray:
+    global interpreter, input_details, output_details
+    with interpreter_lock:
+        if interpreter is None:
+            interpreter = tflite.Interpreter(model_path=TFLITE_MODEL_PATH, num_threads=2)
+            interpreter.allocate_tensors()
+            input_details = interpreter.get_input_details()
+            output_details = interpreter.get_output_details()
+
     img_resized = cv2.resize(rgb_img, (INPUT_SIZE, INPUT_SIZE))
     input_data = np.expand_dims(img_resized.astype(np.uint8), axis=0)
     interpreter.set_tensor(input_details[0]['index'], input_data)
@@ -82,10 +95,18 @@ def _draw_landmarks(frame_bgr: np.ndarray, keypoints: np.ndarray):
 
 
 def camera_stream_thread():
-    global latest_frame_jpeg, recording, FRAMES_BUFFER
+    global latest_frame_jpeg, recording, FRAMES_BUFFER, camera_thread
     with picamera.PiCamera(resolution=(320, 240), framerate=20) as camera:
         stream = io.BytesIO()
         for _ in camera.capture_continuous(stream, format='jpeg', use_video_port=True):
+            with lock:
+                active_streaming = stream_clients > 0
+                active_recording = is_recording()
+                recently_active = (time.time() - last_stream_activity_ts) < CAMERA_IDLE_TIMEOUT_SECONDS
+
+            if not active_streaming and not active_recording and not recently_active:
+                break
+
             stream.seek(0)
             jpeg_data = stream.read()
             stream.seek(0)
@@ -120,8 +141,19 @@ def camera_stream_thread():
                 save_video(FRAMES_BUFFER, filepath)
                 FRAMES_BUFFER = []
 
+    with lock:
+        camera_thread = None
 
-threading.Thread(target=camera_stream_thread, daemon=True).start()
+
+def ensure_camera_thread_running():
+    global camera_thread, last_stream_activity_ts
+    with lock:
+        last_stream_activity_ts = time.time()
+        if camera_thread is not None and camera_thread.is_alive():
+            return
+
+        camera_thread = threading.Thread(target=camera_stream_thread, daemon=True)
+        camera_thread.start()
 
 
 @camera_blueprint.route('/camera')
@@ -131,13 +163,32 @@ def camera_page():
 
 @camera_blueprint.route('/stream')
 def stream():
+    ensure_camera_thread_running()
+
     def generate():
+        global stream_clients, last_stream_activity_ts
+        with lock:
+            stream_clients += 1
+            last_stream_activity_ts = time.time()
+
         while True:
-            with lock:
-                frame = latest_frame_jpeg
-            if frame:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            try:
+                with lock:
+                    frame = latest_frame_jpeg
+                    last_stream_activity_ts = time.time()
+                if frame:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                else:
+                    time.sleep(0.05)
+            except GeneratorExit:
+                break
+            except Exception:
+                break
+
+        with lock:
+            stream_clients = max(0, stream_clients - 1)
+            last_stream_activity_ts = time.time()
 
     response = Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -149,6 +200,7 @@ def stream():
 
 @camera_blueprint.route('/start_recording', methods=['POST'])
 def start_recording():
+    ensure_camera_thread_running()
     open(RECORD_FLAG_FILE, 'w').close()
     return '', 204
 

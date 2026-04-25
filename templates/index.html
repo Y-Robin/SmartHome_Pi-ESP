@@ -113,13 +113,13 @@
                             <div class="device-readings">
                                 <div>
                                     <p class="label">Temperatur</p>
-                                    <p class="value" data-field="temp" data-online="{{ temp_value }}">{% if conn == 'connected' %}{{ temp_value }}{% else %}—{% endif %}</p>
+                                    <p class="value" data-field="temp" data-device="{{ device.id }}" data-online="{{ temp_value }}">{% if conn == 'connected' %}{{ temp_value }}{% else %}—{% endif %}</p>
                                 </div>
                                 <div>
                                     <p class="label">Luftfeuchte</p>
-                                    <p class="value" data-field="humidity" data-online="{{ humidity_value }}">{% if conn == 'connected' %}{{ humidity_value }}{% else %}—{% endif %}</p>
+                                    <p class="value" data-field="humidity" data-device="{{ device.id }}" data-online="{{ humidity_value }}">{% if conn == 'connected' %}{{ humidity_value }}{% else %}—{% endif %}</p>
                                 </div>
-                                <p class="muted reading-note" data-field="note" data-online="{{ note_value }}">{% if conn == 'connected' %}{{ note_value }}{% else %}Keine Verbindung{% endif %}</p>
+                                <p class="muted reading-note" data-field="note" data-device="{{ device.id }}" data-online="{{ note_value }}">{% if conn == 'connected' %}{{ note_value }}{% else %}Keine Verbindung{% endif %}</p>
                             </div>
                         {% endif %}
 
@@ -231,5 +231,57 @@
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         xhr.send('command=' + command);
     }
+
+    function formatReadingTimestamp(isoTimestamp) {
+        if (!isoTimestamp) return 'Keine Messwerte';
+        var date = new Date(isoTimestamp);
+        if (Number.isNaN(date.getTime())) return 'Keine Messwerte';
+        return 'Letztes Update: ' + date.toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function applyLatestReadings(readings) {
+        Object.keys(readings || {}).forEach(function(deviceId) {
+            var reading = readings[deviceId] || {};
+            var temp = typeof reading.temperature === 'number' ? reading.temperature.toFixed(1) + '°C' : '—';
+            var humidity = typeof reading.humidity === 'number' ? reading.humidity.toFixed(1) + '%' : '—';
+            var note = formatReadingTimestamp(reading.timestamp);
+
+            var tempEl = document.querySelector('[data-field="temp"][data-device="' + deviceId + '"]');
+            var humidityEl = document.querySelector('[data-field="humidity"][data-device="' + deviceId + '"]');
+            var noteEl = document.querySelector('[data-field="note"][data-device="' + deviceId + '"]');
+            var card = document.querySelector('[data-device="' + deviceId + '"]');
+
+            if (tempEl) tempEl.dataset.online = temp;
+            if (humidityEl) humidityEl.dataset.online = humidity;
+            if (noteEl) noteEl.dataset.online = note;
+
+            if (card) {
+                var statusPill = card.querySelector('.status-pill');
+                var isConnected = statusPill && statusPill.className.indexOf('status-connected') !== -1;
+                if (isConnected) {
+                    if (tempEl) tempEl.textContent = temp;
+                    if (humidityEl) humidityEl.textContent = humidity;
+                    if (noteEl) noteEl.textContent = note;
+                }
+            }
+        });
+    }
+
+    function loadLatestReadingsAsync() {
+        fetch('/api/latest_readings')
+            .then(function(response) { return response.json(); })
+            .then(function(data) { applyLatestReadings(data); })
+            .catch(function(error) { console.warn('Latest readings unavailable:', error); });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(loadLatestReadingsAsync, 0);
+    });
 </script>
 {% endblock %}

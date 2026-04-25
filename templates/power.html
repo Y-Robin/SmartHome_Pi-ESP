@@ -149,12 +149,22 @@
         });
     }
 
+    function asNumber(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+    }
+
     function updateStats(latest) {
         if (!latest) return;
-        document.getElementById('voltageValue').textContent = latest.voltage !== null ? `${latest.voltage.toFixed(1)} V` : '–';
-        document.getElementById('currentValue').textContent = latest.current !== null ? `${latest.current.toFixed(3)} A` : '–';
-        document.getElementById('powerValue').textContent = latest.power !== null ? `${latest.power.toFixed(1)} W` : '–';
-        document.getElementById('energyValue').textContent = latest.energy !== null ? `${latest.energy.toFixed(1)} Wh` : '–';
+        const voltage = asNumber(latest.voltage);
+        const current = asNumber(latest.current);
+        const power = asNumber(latest.power);
+        const energy = asNumber(latest.energy);
+
+        document.getElementById('voltageValue').textContent = voltage !== null ? `${voltage.toFixed(1)} V` : '–';
+        document.getElementById('currentValue').textContent = current !== null ? `${current.toFixed(3)} A` : '–';
+        document.getElementById('powerValue').textContent = power !== null ? `${power.toFixed(1)} W` : '–';
+        document.getElementById('energyValue').textContent = energy !== null ? `${energy.toFixed(1)} Wh` : '–';
     }
 
     function trimSamples(durationSeconds) {

@@ -69,19 +69,36 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    async function loadModels() {
-        const data = await fetchJson('/ollama-chat/api/models');
-        state.models = data.models;
-        modelSelect.innerHTML = '';
-        for (const model of state.models) {
-            const option = document.createElement('option');
-            option.value = model;
-            option.textContent = model;
-            modelSelect.appendChild(option);
+    function renderMessages(messages) {
+        messagesContainer.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        for (const message of messages) {
+            const row = document.createElement('div');
+            row.className = `ollama-message ${message.role}`;
+            row.innerHTML = `<p>${escapeHtml(message.content).replaceAll('\n', '<br>')}</p>`;
+            fragment.appendChild(row);
         }
-        statusEl.textContent = state.models.length
-            ? `${state.models.length} Modell(e) verfügbar`
-            : 'Keine Modelle gefunden.';
+        messagesContainer.appendChild(fragment);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    async function loadModels() {
+        try {
+            const data = await fetchJson('/ollama-chat/api/models');
+            state.models = data.models;
+            modelSelect.innerHTML = '';
+            for (const model of state.models) {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            }
+            statusEl.textContent = state.models.length
+                ? `${state.models.length} Modell(e) verfügbar`
+                : 'Keine Modelle gefunden.';
+        } catch (error) {
+            statusEl.textContent = `Modelle aktuell nicht erreichbar (${error.message})`;
+        }
     }
 
     async function loadSessions() {
@@ -112,16 +129,15 @@
 
     async function openSession(sessionId) {
         state.activeSessionId = sessionId;
-        const data = await fetchJson(`/ollama-chat/api/sessions/${sessionId}/messages`);
+        titleEl.textContent = 'Lade Chat…';
+        messagesContainer.innerHTML = '<p class="snake-status">Nachrichten werden geladen…</p>';
+        const data = await fetchJson(`/ollama-chat/api/sessions/${sessionId}/messages?limit=120`);
         const session = data.session;
 
         titleEl.textContent = session.title;
         modelLabelEl.textContent = session.model || modelSelect.value || '-';
 
-        messagesContainer.innerHTML = '';
-        for (const message of data.messages) {
-            appendMessage(message.role, message.content);
-        }
+        renderMessages(data.messages);
 
         if (session.model && state.models.includes(session.model)) {
             modelSelect.value = session.model;
@@ -176,12 +192,12 @@
     });
 
     async function init() {
-        try {
-            await loadModels();
-            await loadSessions();
-        } catch (error) {
-            statusEl.textContent = `Fehler beim Laden: ${error.message}`;
-        }
+        await Promise.allSettled([
+            loadSessions().catch((error) => {
+                statusEl.textContent = `Fehler beim Laden der Chats: ${error.message}`;
+            }),
+            loadModels(),
+        ]);
     }
 
     init();

@@ -21,10 +21,10 @@ _SKELETON_EDGES = [
     (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)
 ]
 
-interpreter = tflite.Interpreter(model_path=TFLITE_MODEL_PATH, num_threads=2)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+interpreter = None
+input_details = None
+output_details = None
+interpreter_lock = threading.Lock()
 
 def load_config():
     with open(Path("config.yaml"), "r") as file:
@@ -53,6 +53,14 @@ def init_state(cam_id):
         }
 
 def detect_landmarks(rgb_img):
+    global interpreter, input_details, output_details
+    with interpreter_lock:
+        if interpreter is None:
+            interpreter = tflite.Interpreter(model_path=TFLITE_MODEL_PATH, num_threads=2)
+            interpreter.allocate_tensors()
+            input_details = interpreter.get_input_details()
+            output_details = interpreter.get_output_details()
+
     img_resized = cv2.resize(rgb_img, (INPUT_SIZE, INPUT_SIZE))
     input_data = np.expand_dims(img_resized.astype(np.uint8), axis=0)
     interpreter.set_tensor(input_details[0]['index'], input_data)
