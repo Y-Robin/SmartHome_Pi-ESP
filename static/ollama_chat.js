@@ -51,6 +51,16 @@
         }
     }
 
+
+    function upsertSession(session) {
+        const index = state.sessions.findIndex((item) => item.id === session.id);
+        if (index >= 0) {
+            state.sessions[index] = session;
+        } else {
+            state.sessions.unshift(session);
+        }
+    }
+
     function appendMessage(role, content) {
         const row = document.createElement('div');
         row.className = `ollama-message ${role}`;
@@ -90,9 +100,14 @@
             method: 'POST',
             body: JSON.stringify({ model }),
         });
+
         state.activeSessionId = data.session.id;
-        await loadSessions();
-        await openSession(data.session.id);
+        upsertSession(data.session);
+        renderSessionList();
+
+        titleEl.textContent = data.session.title;
+        modelLabelEl.textContent = data.session.model || modelSelect.value || '-';
+        messagesContainer.innerHTML = '';
     }
 
     async function openSession(sessionId) {
@@ -142,7 +157,10 @@
             });
             appendMessage('assistant', data.assistant_message.content);
             statusEl.textContent = 'Fertig.';
-            await loadSessions();
+            titleEl.textContent = data.session.title;
+            modelLabelEl.textContent = data.session.model || modelSelect.value || '-';
+            upsertSession(data.session);
+            renderSessionList();
         } catch (error) {
             appendMessage('assistant', `Fehler: ${error.message}`);
             statusEl.textContent = `Fehler: ${error.message}`;

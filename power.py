@@ -11,7 +11,7 @@ DEFAULT_DEVICE = {
     "name": "Socket 0",
     "url": "http://192.168.178.52/rpc/Switch.GetStatus?id=0",
 }
-POLL_INTERVAL_SECONDS = 0.2
+POLL_INTERVAL_SECONDS = 1.0
 REQUEST_TIMEOUT_SECONDS = 5
 
 
