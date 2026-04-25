@@ -55,6 +55,8 @@
         <h2>Diagnose</h2>
         <p class="muted">Zeigt die letzten Server-/Datenbankfehler für Temperaturdaten.</p>
         <p class="muted" id="temperatureDbStatus">DB-Status wird geprüft…</p>
+        <button type="button" onclick="triggerTemperatureDbRepair()">DB-Reparatur starten (Backup wird erstellt)</button>
+        <p class="muted" id="temperatureDbRepairResult"></p>
         <pre id="temperatureErrorLog" class="muted" style="white-space: pre-wrap; margin: 0;">Keine Fehler gemeldet.</pre>
     </section>
 
@@ -266,6 +268,24 @@
                 statusNode.textContent = `DB-Status: ${payload.status} – ${payload.message || ''}`;
             } catch (error) {
                 statusNode.textContent = `DB-Status konnte nicht geladen werden: ${error.message}`;
+            }
+        }
+
+        async function triggerTemperatureDbRepair() {
+            const node = document.getElementById('temperatureDbRepairResult');
+            node.textContent = 'Reparatur läuft…';
+            try {
+                const response = await fetch('/monitoring/db_repair', { method: 'POST' });
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    node.textContent = `Reparatur fehlgeschlagen: ${payload.message || 'Unbekannter Fehler'}`;
+                    return;
+                }
+                node.textContent = `Reparatur abgeschlossen. Backup: ${payload.backup_path || '-'}`;
+                refreshTemperatureDbStatus();
+                refreshTemperatureErrorLog();
+            } catch (error) {
+                node.textContent = `Reparatur fehlgeschlagen: ${error.message}`;
             }
         }
 

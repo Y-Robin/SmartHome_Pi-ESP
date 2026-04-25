@@ -14,10 +14,14 @@ DEFAULT_DEVICE = {
 }
 POLL_INTERVAL_SECONDS = 5.0
 REQUEST_TIMEOUT_SECONDS = 5
+MALFORMED_DB_RETRY_SECONDS = 60
 
 
 def create_power_blueprint(socketio, db):
     power_blueprint = Blueprint("power", __name__)
+
+    def _is_malformed_db_error(error: Exception) -> bool:
+        return "database disk image is malformed" in str(error).lower()
 
     class PowerData(db.Model):
         __tablename__ = "power_data"
@@ -184,6 +188,9 @@ def create_power_blueprint(socketio, db):
                         "Fehler beim Erfassen von Power-Daten",
                         {"device_id": device_id, "url": device_url, "error": str(error)},
                     )
+                    if _is_malformed_db_error(error):
+                        socketio.sleep(max(MALFORMED_DB_RETRY_SECONDS, poll_interval))
+                        continue
 
                 socketio.sleep(poll_interval)
 
@@ -315,3 +322,5 @@ def create_power_blueprint(socketio, db):
         )
 
     return power_blueprint
+    def _is_malformed_db_error(error: Exception) -> bool:
+        return "database disk image is malformed" in str(error).lower()

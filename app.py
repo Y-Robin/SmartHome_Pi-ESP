@@ -17,6 +17,7 @@ from games import games_blueprint
 from ollama_chat import ollama_chat_blueprint
 from extensions import db
 from monitoring import get_recent_events
+from db_repair import repair_sqlite_database
 
 
 app = Flask(__name__)
@@ -170,6 +171,17 @@ def monitoring_errors():
 @app.route('/monitoring/db_status')
 def monitoring_db_status():
     return jsonify(_sqlite_quick_check())
+
+
+@app.route('/monitoring/db_repair', methods=['POST'])
+def monitoring_db_repair():
+    db_path = _get_sqlite_db_path()
+    if not db_path:
+        return jsonify({'ok': False, 'message': 'Nur SQLite wird unterstützt.'}), 400
+
+    result = repair_sqlite_database(db_path)
+    status_code = 200 if result.get('ok') else 500
+    return jsonify(result), status_code
 
 
 if __name__ == '__main__':
