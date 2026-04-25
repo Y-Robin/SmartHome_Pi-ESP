@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import requests
 import yaml
 from flask import Blueprint, current_app, jsonify, render_template, request
+from monitoring import report_error
 
 DEFAULT_DEVICE = {
     "id": "socket-0",
@@ -178,6 +179,11 @@ def create_power_blueprint(socketio, db):
                 except Exception:
                     db.session.rollback()
                     app.logger.exception("Failed to collect power data from %s", device_url)
+                    report_error(
+                        "power",
+                        "Fehler beim Erfassen von Power-Daten",
+                        {"device_id": device_id, "url": device_url},
+                    )
 
                 socketio.sleep(poll_interval)
 
@@ -199,6 +205,7 @@ def create_power_blueprint(socketio, db):
                 except Exception:
                     db.session.rollback()
                     app.logger.exception("Power cleanup failed")
+                    report_error("power", "Fehler beim Bereinigen alter Power-Daten")
 
                 socketio.sleep(cleanup_interval_seconds)
 
@@ -236,50 +243,58 @@ def create_power_blueprint(socketio, db):
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(seconds=max(duration_seconds or 0, 0))
 
-        query = (
-            PowerData.query.filter(
-                PowerData.timestamp.between(start_time, end_time),
-                PowerData.device_id.in_(device_aliases),
-            )
-            .order_by(PowerData.timestamp.asc())
-        )
-
-        data = []
-        for row in query:
-            timestamp = row.timestamp or datetime.utcnow()
-            aware_ts = timestamp.replace(tzinfo=timezone.utc)
-            data.append(
-                {
-                    "device_id": row.device_id,
-                    "voltage": row.voltage,
-                    "current": row.current,
-                    "power": row.power,
-                    "energy": row.energy,
-                    "timestamp": aware_ts.isoformat(),
-                }
+        try:
+            query = (
+                PowerData.query.filter(
+                    PowerData.timestamp.between(start_time, end_time),
+                    PowerData.device_id.in_(device_aliases),
+                )
+                .order_by(PowerData.timestamp.asc())
             )
 
-        if not data:
-            latest_row = (
-                PowerData.query.filter(PowerData.device_id.in_(device_aliases))
-                .order_by(PowerData.timestamp.desc())
-                .first()
-            )
-            if latest_row is not None:
-                timestamp = latest_row.timestamp or datetime.utcnow()
+            data = []
+            for row in query:
+                timestamp = row.timestamp or datetime.utcnow()
                 aware_ts = timestamp.replace(tzinfo=timezone.utc)
                 data.append(
                     {
-                        "device_id": resolved_device_id,
-                        "voltage": latest_row.voltage,
-                        "current": latest_row.current,
-                        "power": latest_row.power,
-                        "energy": latest_row.energy,
+                        "device_id": row.device_id,
+                        "voltage": row.voltage,
+                        "current": row.current,
+                        "power": row.power,
+                        "energy": row.energy,
                         "timestamp": aware_ts.isoformat(),
                     }
                 )
 
-        return jsonify(data)
+            if not data:
+                latest_row = (
+                    PowerData.query.filter(PowerData.device_id.in_(device_aliases))
+                    .order_by(PowerData.timestamp.desc())
+                    .first()
+                )
+                if latest_row is not None:
+                    timestamp = latest_row.timestamp or datetime.utcnow()
+                    aware_ts = timestamp.replace(tzinfo=timezone.utc)
+                    data.append(
+                        {
+                            "device_id": resolved_device_id,
+                            "voltage": latest_row.voltage,
+                            "current": latest_row.current,
+                            "power": latest_row.power,
+                            "energy": latest_row.energy,
+                            "timestamp": aware_ts.isoformat(),
+                        }
+                    )
+
+            return jsonify(data)
+        except Exception:
+            report_error(
+                "power",
+                "Fehler beim Laden von Power-Daten aus der Datenbank",
+                {"device_id": device_id, "duration_seconds": duration_seconds},
+            )
+            return jsonify({"error": "Power-Daten konnten nicht geladen werden"}), 500
 
     @power_blueprint.route("/get_power_devices")
     def get_power_devices():

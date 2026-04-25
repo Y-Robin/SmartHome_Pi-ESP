@@ -1,6 +1,6 @@
 import os
 import yaml
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from sqlalchemy import event
 from flask_socketio import SocketIO
 import temperature
@@ -15,6 +15,7 @@ from calendar_routes import create_calendar_blueprint
 from games import games_blueprint
 from ollama_chat import ollama_chat_blueprint
 from extensions import db
+from monitoring import get_recent_events
 
 
 app = Flask(__name__)
@@ -106,6 +107,13 @@ def video_streams():
         cam_id=selected_cam,
         cameras=camera_devices,
     )
+
+
+@app.route('/monitoring/errors')
+def monitoring_errors():
+    component = request.args.get('component')
+    limit = request.args.get('limit', default=30, type=int)
+    return jsonify(get_recent_events(component=component, limit=limit))
 
 
 if __name__ == '__main__':

@@ -60,6 +60,12 @@
 
     <canvas id="powerChart" style="width:100%; max-height:420px;"></canvas>
 </div>
+
+<div class="card" style="margin-top: 1rem;">
+    <h2>Diagnose</h2>
+    <p class="muted">Zeigt die letzten Server-/Datenbankfehler für den Power-Monitor.</p>
+    <pre id="powerErrorLog" class="muted" style="white-space: pre-wrap; margin: 0;">Keine Fehler gemeldet.</pre>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -185,6 +191,10 @@
         const durationSeconds = parseInt(document.getElementById('timeRange').value, 10);
 
         const response = await fetch(`/get_power_data?duration_seconds=${durationSeconds}&device_id=${selectedDeviceId}`);
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Fehler beim Laden von Power-Daten');
+        }
         const data = await response.json();
 
         samples = data.map(sample => ({ ...sample, timestamp: new Date(sample.timestamp) }));
@@ -212,13 +222,23 @@
         selector.value = selectedDeviceId;
     }
 
-    document.getElementById('refreshButton').addEventListener('click', fetchHistoricalData);
-    document.getElementById('timeRange').addEventListener('change', fetchHistoricalData);
+    document.getElementById('refreshButton').addEventListener('click', () => {
+        fetchHistoricalData().catch(error => {
+            document.getElementById('powerErrorLog').textContent = `UI-Fehler: ${error.message}`;
+        });
+    });
+    document.getElementById('timeRange').addEventListener('change', () => {
+        fetchHistoricalData().catch(error => {
+            document.getElementById('powerErrorLog').textContent = `UI-Fehler: ${error.message}`;
+        });
+    });
     document.getElementById('deviceSelector').addEventListener('change', (event) => {
         selectedDeviceId = event.target.value;
         samples = [];
         document.getElementById('sampleCount').textContent = '0';
-        fetchHistoricalData();
+        fetchHistoricalData().catch(error => {
+            document.getElementById('powerErrorLog').textContent = `UI-Fehler: ${error.message}`;
+        });
     });
 
     socket.on('power_sample', sample => {
@@ -229,11 +249,33 @@
         }
     });
 
+    async function refreshPowerErrorLog() {
+        const log = document.getElementById('powerErrorLog');
+        try {
+            const response = await fetch('/monitoring/errors?component=power&limit=6');
+            const events = await response.json();
+            if (!Array.isArray(events) || events.length === 0) {
+                log.textContent = 'Keine Fehler gemeldet.';
+                return;
+            }
+
+            log.textContent = events
+                .map(event => `[${event.timestamp}] ${event.message} ${JSON.stringify(event.context || {})}`)
+                .join('\n');
+        } catch (error) {
+            log.textContent = `Monitoring-Fehler: ${error.message}`;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         buildChart();
         loadDevices().then(() => {
-            fetchHistoricalData();
+            fetchHistoricalData().catch(error => {
+                document.getElementById('powerErrorLog').textContent = `UI-Fehler: ${error.message}`;
+            });
         });
+        refreshPowerErrorLog();
+        setInterval(refreshPowerErrorLog, 10000);
     });
 </script>
 {% endblock %}

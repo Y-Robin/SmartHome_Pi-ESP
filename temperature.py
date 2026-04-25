@@ -6,6 +6,7 @@ from flask_socketio import SocketIO
 import yaml
 
 from models import ShowerEvent
+from monitoring import report_error
 
 
 def load_devices_from_config():
@@ -65,7 +66,12 @@ def create_temperature_blueprint(socketio, db):
 
     @temperature_blueprint.route('/get_available_devices')
     def get_available_devices():
-        devices = load_devices_from_config()
+        try:
+            devices = load_devices_from_config()
+        except Exception:
+            report_error('temperature', 'Konnte Geräte-Konfiguration nicht laden')
+            return jsonify({'error': 'Geräteliste konnte nicht geladen werden'}), 500
+
         device_list = [
             {
                 'device_id': device_id,
@@ -77,22 +83,40 @@ def create_temperature_blueprint(socketio, db):
 
     @temperature_blueprint.route('/record_temperature', methods=['POST'])
     def record_temperature():
-        data = request.get_json()
-        new_record = TemperatureData(
-            device_id=data['device_id'],  # Handle device_id
-            temperature=data['temperature'],
-            humidity=data['humidity']
-        )
-        db.session.add(new_record)
-        db.session.commit()
-        _update_shower_events(data['device_id'])
-        # Emit the new temperature data
-        socketio.emit('new_temperature_data', {
-            'device_id': data['device_id'],  # Include device_id in the emitted data
-            'temperature': data['temperature'],
-            'humidity': data['humidity']
-        })
-        return jsonify({"message": "Data recorded"}), 201
+        data = request.get_json() or {}
+        required_fields = ['device_id', 'temperature', 'humidity']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            report_error(
+                'temperature',
+                'Temperatur-POST ohne vollständige Pflichtfelder',
+                {'missing_fields': missing_fields},
+            )
+            return jsonify({'error': 'Pflichtfelder fehlen', 'missing_fields': missing_fields}), 400
+
+        try:
+            new_record = TemperatureData(
+                device_id=data['device_id'],
+                temperature=data['temperature'],
+                humidity=data['humidity']
+            )
+            db.session.add(new_record)
+            db.session.commit()
+            _update_shower_events(data['device_id'])
+            socketio.emit('new_temperature_data', {
+                'device_id': data['device_id'],
+                'temperature': data['temperature'],
+                'humidity': data['humidity']
+            })
+            return jsonify({"message": "Data recorded"}), 201
+        except Exception:
+            db.session.rollback()
+            report_error(
+                'temperature',
+                'Fehler beim Speichern der Temperaturdaten in die Datenbank',
+                {'device_id': data.get('device_id')},
+            )
+            return jsonify({'error': 'Daten konnten nicht gespeichert werden'}), 500
 
     @temperature_blueprint.route('/get_temperature_data')
     def get_temperature_data():
@@ -115,7 +139,15 @@ def create_temperature_blueprint(socketio, db):
             start = end - timedelta(hours=24)
             query = query.filter(TemperatureData.timestamp.between(start, end))
 
-        data = query.order_by(TemperatureData.timestamp.asc()).all()
+        try:
+            data = query.order_by(TemperatureData.timestamp.asc()).all()
+        except Exception:
+            report_error(
+                'temperature',
+                'Fehler beim Laden von Temperaturdaten aus der Datenbank',
+                {'device_id': device_id, 'date': date_str},
+            )
+            return jsonify({'error': 'Temperaturdaten konnten nicht geladen werden'}), 500
 
         return jsonify([
             {
