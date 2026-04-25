@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 import yaml
+from sqlalchemy.exc import DatabaseError
 from flask import Blueprint, current_app, jsonify, render_template, request
 
 DEFAULT_DEVICE = {
@@ -85,6 +86,14 @@ def create_power_blueprint(socketio, db):
         first_device = devices[0]
         return first_device.get("id") or first_device.get("url")
 
+
+
+    def _is_sqlite_malformed_error(exc: Exception) -> bool:
+        if not isinstance(exc, DatabaseError):
+            return False
+        message = str(exc).lower()
+        return 'database disk image is malformed' in message or 'malformed' in message
+
     def _parse_power_value(payload: Dict[str, Any]) -> Optional[float]:
         return payload.get("apower") or payload.get("power")
 
@@ -104,29 +113,40 @@ def create_power_blueprint(socketio, db):
                     response.raise_for_status()
                     payload = response.json() or {}
 
-                    sample = PowerData(
-                        device_id=device_id,
-                        voltage=payload.get("voltage"),
-                        current=payload.get("current"),
-                        power=_parse_power_value(payload),
-                        energy=_parse_energy_value(payload),
-                    )
-                    db.session.add(sample)
-                    db.session.commit()
+                    event_payload = {
+                        "device_id": device_id,
+                        "voltage": payload.get("voltage"),
+                        "current": payload.get("current"),
+                        "power": _parse_power_value(payload),
+                        "energy": _parse_energy_value(payload),
+                        "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+                    }
 
-                    socketio.emit(
-                        "power_sample",
-                        {
-                            "device_id": sample.device_id,
-                            "voltage": sample.voltage,
-                            "current": sample.current,
-                            "power": sample.power,
-                            "energy": sample.energy,
-                            "timestamp": (sample.timestamp or datetime.utcnow())
-                            .replace(tzinfo=timezone.utc)
-                            .isoformat(),
-                        },
-                    )
+                    if not app.config.get("POWER_DB_MALFORMED"):
+                        try:
+                            sample = PowerData(
+                                device_id=device_id,
+                                voltage=event_payload["voltage"],
+                                current=event_payload["current"],
+                                power=event_payload["power"],
+                                energy=event_payload["energy"],
+                            )
+                            db.session.add(sample)
+                            db.session.commit()
+                            event_payload["timestamp"] = (sample.timestamp or datetime.utcnow()).replace(
+                                tzinfo=timezone.utc
+                            ).isoformat()
+                        except Exception as exc:
+                            db.session.rollback()
+                            if _is_sqlite_malformed_error(exc):
+                                app.config["POWER_DB_MALFORMED"] = True
+                                app.logger.error(
+                                    "SQLite DB ist beschädigt (malformed). Power-Daten werden nur noch live gestreamt, ohne DB-Schreibzugriff."
+                                )
+                            else:
+                                raise
+
+                    socketio.emit("power_sample", event_payload)
                 except Exception:
                     db.session.rollback()
                     app.logger.exception("Failed to collect power data from %s", device_url)
@@ -148,8 +168,12 @@ def create_power_blueprint(socketio, db):
                         deleted,
                         retention_days,
                     )
-                except Exception:
+                except Exception as exc:
                     db.session.rollback()
+                    if _is_sqlite_malformed_error(exc):
+                        app.config["POWER_DB_MALFORMED"] = True
+                        app.logger.error("Power cleanup deaktiviert: SQLite DB ist beschädigt (malformed).")
+                        return
                     app.logger.exception("Power cleanup failed")
 
                 socketio.sleep(cleanup_interval_seconds)
@@ -187,6 +211,9 @@ def create_power_blueprint(socketio, db):
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(seconds=max(duration_seconds or 0, 0))
 
+        if current_app.config.get("POWER_DB_MALFORMED"):
+            return jsonify([])
+
         query = (
             PowerData.query.filter(
                 PowerData.timestamp.between(start_time, end_time),
@@ -196,7 +223,17 @@ def create_power_blueprint(socketio, db):
         )
 
         data = []
-        for row in query:
+        try:
+            rows = list(query)
+        except Exception as exc:
+            db.session.rollback()
+            if _is_sqlite_malformed_error(exc):
+                current_app.config["POWER_DB_MALFORMED"] = True
+                current_app.logger.error("Power-Historie deaktiviert: SQLite DB ist beschädigt (malformed).")
+                return jsonify([])
+            raise
+
+        for row in rows:
             timestamp = row.timestamp or datetime.utcnow()
             aware_ts = timestamp.replace(tzinfo=timezone.utc)
             data.append(
