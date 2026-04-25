@@ -58,8 +58,7 @@ def create_led_blueprint(socketio: SocketIO, db):
 
     @led_blueprint.route('/')
     def index():
-        latest_readings = fetch_latest_readings()
-        grouped_devices = group_devices_by_room(latest_readings)
+        grouped_devices = group_devices_by_room({})
         weather = fetch_weather()
 
         return render_template(
@@ -68,6 +67,19 @@ def create_led_blueprint(socketio: SocketIO, db):
             weather=weather,
             has_devices=bool(grouped_devices),
         )
+
+    @led_blueprint.route('/api/latest_readings')
+    def latest_readings_api():
+        readings = fetch_latest_readings()
+        payload = {}
+        for device_id, reading in readings.items():
+            timestamp = reading.get("timestamp")
+            payload[device_id] = {
+                "temperature": reading.get("temperature"),
+                "humidity": reading.get("humidity"),
+                "timestamp": timestamp.isoformat() if timestamp else None,
+            }
+        return jsonify(payload)
 
 
     @led_blueprint.route('/control_led/<device_id>', methods=['POST'])
