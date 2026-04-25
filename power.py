@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -27,9 +27,7 @@ def create_power_blueprint(socketio, db):
         current = db.Column(db.Float)
         power = db.Column(db.Float)
         energy = db.Column(db.Float)
-        timestamp = db.Column(
-            db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
-        )
+        timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     def _load_devices_from_config_file() -> Optional[List[Dict[str, str]]]:
         config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -122,9 +120,7 @@ def create_power_blueprint(socketio, db):
                             "current": sample.current,
                             "power": sample.power,
                             "energy": sample.energy,
-                            "timestamp": (sample.timestamp or datetime.utcnow())
-                            .replace(tzinfo=timezone.utc)
-                            .isoformat(),
+                            "timestamp": (sample.timestamp or datetime.utcnow()).isoformat(),
                         },
                     )
                 except Exception:
@@ -140,7 +136,7 @@ def create_power_blueprint(socketio, db):
         with app.app_context():
             while True:
                 try:
-                    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+                    cutoff = datetime.utcnow() - timedelta(days=retention_days)
                     deleted = PowerData.query.filter(PowerData.timestamp < cutoff).delete()
                     db.session.commit()
                     app.logger.info(
@@ -198,7 +194,7 @@ def create_power_blueprint(socketio, db):
         data = []
         for row in query:
             timestamp = row.timestamp or datetime.utcnow()
-            aware_ts = timestamp.replace(tzinfo=timezone.utc)
+            aware_ts = timestamp
             data.append(
                 {
                     "device_id": row.device_id,
