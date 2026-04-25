@@ -639,3 +639,123 @@ button:active {
     height: auto;
     max-height: 260px;
 }
+
+.ollama-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.ollama-sidebar {
+    max-height: 75vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ollama-model-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ollama-model-row select,
+.ollama-input-row textarea {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    font: inherit;
+}
+
+.ollama-session-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ollama-session-item button {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ollama-session-item.active button {
+    border-color: var(--primary);
+    background: #ebf2ff;
+}
+
+.ollama-session-item small {
+    color: var(--muted);
+}
+
+.ollama-chat-panel {
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ollama-messages {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    overflow-y: auto;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 420px;
+}
+
+.ollama-message {
+    max-width: 85%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    line-height: 1.45;
+}
+
+.ollama-message.user {
+    align-self: flex-end;
+    background: #dbeafe;
+}
+
+.ollama-message.assistant {
+    align-self: flex-start;
+    background: #e2e8f0;
+}
+
+.ollama-message p {
+    margin: 0;
+}
+
+.ollama-input-row {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+}
+
+@media (max-width: 1000px) {
+    .ollama-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .ollama-chat-panel,
+    .ollama-sidebar {
+        min-height: 50vh;
+        max-height: none;
+    }
+}

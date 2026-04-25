@@ -35,3 +35,6 @@ socket_devices:
     ip: 192.168.178.xxx  # Example Shelly Plus Plug S V2
     room: Wohnzimmer
     elements: [Socket]
+
+ollama:
+  base_url: http://192.168.178.41:11434

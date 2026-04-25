@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Ollama Chat{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div>
+        <p class="eyebrow">Lokale KI</p>
+        <h1>Ollama Chat</h1>
+        <p class="subhead">Modelle auf {{ ollama_base_url }} nutzen, Kontexte speichern und alte Chats wieder öffnen.</p>
+    </div>
+</div>
+
+<div class="ollama-layout">
+    <aside class="card ollama-sidebar">
+        <div class="card-header">
+            <h2>Chats</h2>
+            <button id="new-chat-btn" type="button" class="games-tab active">+ Neu</button>
+        </div>
+        <div class="ollama-model-row">
+            <label for="model-select">Modell</label>
+            <select id="model-select"></select>
+        </div>
+        <p id="ollama-status" class="snake-status">Lade Modelle…</p>
+        <ul id="chat-session-list" class="ollama-session-list"></ul>
+    </aside>
+
+    <section class="card ollama-chat-panel">
+        <div class="card-header">
+            <h2 id="active-chat-title">Kein Chat ausgewählt</h2>
+            <span class="pill pill-outline" id="active-model-label">-</span>
+        </div>
+        <div id="chat-messages" class="ollama-messages"></div>
+        <form id="chat-form" class="ollama-input-row">
+            <textarea id="chat-input" placeholder="Nachricht eingeben..." rows="3" required></textarea>
+            <button type="submit" class="games-tab active">Senden</button>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='ollama_chat.js') }}"></script>
+{% endblock %}
