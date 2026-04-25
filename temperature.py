@@ -102,21 +102,31 @@ def create_temperature_blueprint(socketio, db):
             )
             db.session.add(new_record)
             db.session.commit()
-            _update_shower_events(data['device_id'])
-            socketio.emit('new_temperature_data', {
-                'device_id': data['device_id'],
-                'temperature': data['temperature'],
-                'humidity': data['humidity']
-            })
-            return jsonify({"message": "Data recorded"}), 201
-        except Exception:
+        except Exception as error:
             db.session.rollback()
             report_error(
                 'temperature',
                 'Fehler beim Speichern der Temperaturdaten in die Datenbank',
-                {'device_id': data.get('device_id')},
+                {'device_id': data.get('device_id'), 'error': str(error)},
             )
             return jsonify({'error': 'Daten konnten nicht gespeichert werden'}), 500
+
+        try:
+            _update_shower_events(data['device_id'])
+        except Exception as error:
+            db.session.rollback()
+            report_error(
+                'temperature',
+                'Fehler beim Aktualisieren der Shower-Erkennung',
+                {'device_id': data.get('device_id'), 'error': str(error)},
+            )
+
+        socketio.emit('new_temperature_data', {
+            'device_id': data['device_id'],
+            'temperature': data['temperature'],
+            'humidity': data['humidity']
+        })
+        return jsonify({"message": "Data recorded"}), 201
 
     @temperature_blueprint.route('/get_temperature_data')
     def get_temperature_data():
@@ -141,11 +151,11 @@ def create_temperature_blueprint(socketio, db):
 
         try:
             data = query.order_by(TemperatureData.timestamp.asc()).all()
-        except Exception:
+        except Exception as error:
             report_error(
                 'temperature',
                 'Fehler beim Laden von Temperaturdaten aus der Datenbank',
-                {'device_id': device_id, 'date': date_str},
+                {'device_id': device_id, 'date': date_str, 'error': str(error)},
             )
             return jsonify({'error': 'Temperaturdaten konnten nicht geladen werden'}), 500
 

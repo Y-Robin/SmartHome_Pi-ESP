@@ -176,13 +176,13 @@ def create_power_blueprint(socketio, db):
                             .isoformat(),
                         },
                     )
-                except Exception:
+                except Exception as error:
                     db.session.rollback()
                     app.logger.exception("Failed to collect power data from %s", device_url)
                     report_error(
                         "power",
                         "Fehler beim Erfassen von Power-Daten",
-                        {"device_id": device_id, "url": device_url},
+                        {"device_id": device_id, "url": device_url, "error": str(error)},
                     )
 
                 socketio.sleep(poll_interval)
@@ -202,10 +202,14 @@ def create_power_blueprint(socketio, db):
                         deleted,
                         retention_days,
                     )
-                except Exception:
+                except Exception as error:
                     db.session.rollback()
                     app.logger.exception("Power cleanup failed")
-                    report_error("power", "Fehler beim Bereinigen alter Power-Daten")
+                    report_error(
+                        "power",
+                        "Fehler beim Bereinigen alter Power-Daten",
+                        {"error": str(error)},
+                    )
 
                 socketio.sleep(cleanup_interval_seconds)
 
@@ -288,11 +292,11 @@ def create_power_blueprint(socketio, db):
                     )
 
             return jsonify(data)
-        except Exception:
+        except Exception as error:
             report_error(
                 "power",
                 "Fehler beim Laden von Power-Daten aus der Datenbank",
-                {"device_id": device_id, "duration_seconds": duration_seconds},
+                {"device_id": device_id, "duration_seconds": duration_seconds, "error": str(error)},
             )
             return jsonify({"error": "Power-Daten konnten nicht geladen werden"}), 500
 
