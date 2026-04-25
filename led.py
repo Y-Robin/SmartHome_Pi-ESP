@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import Dict, List
 
 import requests
@@ -16,6 +17,11 @@ def _safe_load_config(config_path: Path) -> Dict:
 
     with open(config_path, "r") as file:
         return yaml.safe_load(file) or {}
+
+
+WEATHER_CACHE_TTL = timedelta(minutes=10)
+_weather_cache = {"timestamp": None, "data": None}
+_weather_cache_lock = Lock()
 
 def create_led_blueprint(socketio: SocketIO, db):
     led_blueprint = Blueprint('led', __name__)
@@ -230,6 +236,13 @@ def create_led_blueprint(socketio: SocketIO, db):
         return "unknown"
 
     def fetch_weather():
+        now = datetime.utcnow()
+        with _weather_cache_lock:
+            cache_ts = _weather_cache["timestamp"]
+            cache_data = _weather_cache["data"]
+            if cache_ts and cache_data and (now - cache_ts) < WEATHER_CACHE_TTL:
+                return cache_data
+
         locations = {
             "Saarburg": {"latitude": 49.6097, "longitude": 6.5438},
             "Schengen": {"latitude": 49.4683, "longitude": 6.3667},
@@ -274,7 +287,7 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "forecast_days": 1,
                         "timezone": "Europe/Berlin",
                     },
-                    timeout=5,
+                    timeout=1.5,
                 )
                 response.raise_for_status()
                 payload = response.json()
@@ -310,6 +323,10 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "error": "Wetterdaten konnten nicht geladen werden",
                     }
                 )
+
+        with _weather_cache_lock:
+            _weather_cache["timestamp"] = datetime.utcnow()
+            _weather_cache["data"] = weather_reports
 
         return weather_reports
 

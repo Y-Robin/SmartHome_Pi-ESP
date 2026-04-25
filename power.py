@@ -85,12 +85,40 @@ def create_power_blueprint(socketio, db):
         first_device = devices[0]
         return first_device.get("id") or first_device.get("url")
 
+    def _first_present_number(payload: Dict[str, Any], keys: List[str]) -> Optional[float]:
+        for key in keys:
+            value = payload.get(key)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def _normalize_payload(raw_payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = raw_payload.get("result") if isinstance(raw_payload, dict) else None
+        if not isinstance(payload, dict):
+            payload = raw_payload if isinstance(raw_payload, dict) else {}
+
+        for candidate in ("switch:0", "em:0"):
+            nested = payload.get(candidate)
+            if isinstance(nested, dict):
+                payload = {**payload, **nested}
+                break
+
+        return payload
+
     def _parse_power_value(payload: Dict[str, Any]) -> Optional[float]:
-        return payload.get("apower") or payload.get("power")
+        return _first_present_number(payload, ["apower", "power", "active_power"])
 
     def _parse_energy_value(payload: Dict[str, Any]) -> Optional[float]:
-        energy_payload = payload.get("aenergy") or {}
-        return energy_payload.get("total") or energy_payload.get("total_wh")
+        energy_payload = payload.get("aenergy")
+        if isinstance(energy_payload, dict):
+            parsed = _first_present_number(energy_payload, ["total", "total_wh"])
+            if parsed is not None:
+                return parsed
+        return _first_present_number(payload, ["energy", "total_energy", "total_wh"])
 
     def _collect_device_data(app, device_config: Dict[str, str]):
         device_url = device_config.get("url") or DEFAULT_DEVICE["url"]
@@ -102,12 +130,12 @@ def create_power_blueprint(socketio, db):
                 try:
                     response = requests.get(device_url, timeout=REQUEST_TIMEOUT_SECONDS)
                     response.raise_for_status()
-                    payload = response.json() or {}
+                    payload = _normalize_payload(response.json() or {})
 
                     sample = PowerData(
                         device_id=device_id,
-                        voltage=payload.get("voltage"),
-                        current=payload.get("current"),
+                        voltage=_first_present_number(payload, ["voltage", "a_voltage"]),
+                        current=_first_present_number(payload, ["current", "a_current"]),
                         power=_parse_power_value(payload),
                         energy=_parse_energy_value(payload),
                     )
