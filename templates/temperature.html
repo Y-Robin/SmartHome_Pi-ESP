@@ -51,6 +51,14 @@
             <canvas id="humidityChart"></canvas>
         </div>
     </section>
+    <section class="card" style="margin-top: 1rem;">
+        <h2>Diagnose</h2>
+        <p class="muted">Zeigt die letzten Server-/Datenbankfehler für Temperaturdaten.</p>
+        <p class="muted" id="temperatureDbStatus">DB-Status wird geprüft…</p>
+        <button type="button" onclick="triggerTemperatureDbRepair()">DB-Reparatur starten (Backup wird erstellt)</button>
+        <p class="muted" id="temperatureDbRepairResult"></p>
+        <pre id="temperatureErrorLog" class="muted" style="white-space: pre-wrap; margin: 0;">Keine Fehler gemeldet.</pre>
+    </section>
 
 {% endblock %}
 
@@ -189,7 +197,7 @@
         }
 	
 
-	function updateChartForSelectedDevice() {
+        function updateChartForSelectedDevice() {
 
 	    const selectedDevice = document.getElementById('deviceSelect').value;
             const selectedOption = document.getElementById('deviceSelect').selectedOptions[0];
@@ -203,7 +211,13 @@
 
 	    fetch(`/get_temperature_data?device_id=${selectedDevice}&date=${selectedDateValue || ''}`)
 
-		.then(response => response.json())
+		.then(async response => {
+                    if (!response.ok) {
+                        const payload = await response.json().catch(() => ({}));
+                        throw new Error(payload.error || 'Fehler beim Laden der Temperaturdaten');
+                    }
+                    return response.json();
+                })
 
 		.then(data => {
 
@@ -211,7 +225,10 @@
 
 		    updateChartWithData(globalData);
 
-		});
+		})
+                .catch(error => {
+                    document.getElementById('temperatureErrorLog').textContent = `UI-Fehler: ${error.message}`;
+                });
 
 	}
 
@@ -221,8 +238,63 @@
 
 	}
 
+        async function refreshTemperatureErrorLog() {
+            const log = document.getElementById('temperatureErrorLog');
+            try {
+                const response = await fetch('/monitoring/errors?component=temperature&limit=6');
+                const events = await response.json();
+                if (!Array.isArray(events) || events.length === 0) {
+                    log.textContent = 'Keine Fehler gemeldet.';
+                    return;
+                }
+
+                log.textContent = events
+                    .map(event => `[${event.timestamp}] ${event.message} ${JSON.stringify(event.context || {})}`)
+                    .join('\n');
+            } catch (error) {
+                log.textContent = `Monitoring-Fehler: ${error.message}`;
+            }
+        }
+
+        async function refreshTemperatureDbStatus() {
+            const statusNode = document.getElementById('temperatureDbStatus');
+            try {
+                const response = await fetch('/monitoring/db_status');
+                const payload = await response.json();
+                if (payload.status === 'ok') {
+                    statusNode.textContent = 'DB-Status: OK';
+                    return;
+                }
+                statusNode.textContent = `DB-Status: ${payload.status} – ${payload.message || ''}`;
+            } catch (error) {
+                statusNode.textContent = `DB-Status konnte nicht geladen werden: ${error.message}`;
+            }
+        }
+
+        async function triggerTemperatureDbRepair() {
+            const node = document.getElementById('temperatureDbRepairResult');
+            node.textContent = 'Reparatur läuft…';
+            try {
+                const response = await fetch('/monitoring/db_repair', { method: 'POST' });
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    node.textContent = `Reparatur fehlgeschlagen: ${payload.message || 'Unbekannter Fehler'}`;
+                    return;
+                }
+                node.textContent = `Reparatur abgeschlossen. Backup: ${payload.backup_path || '-'}`;
+                refreshTemperatureDbStatus();
+                refreshTemperatureErrorLog();
+            } catch (error) {
+                node.textContent = `Reparatur fehlgeschlagen: ${error.message}`;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
 		updateChartForSelectedDevice(); // Load data for the default selected device on page load
+                refreshTemperatureErrorLog();
+                refreshTemperatureDbStatus();
+                setInterval(refreshTemperatureErrorLog, 10000);
+                setInterval(refreshTemperatureDbStatus, 30000);
         });
 
         // Initialize chart with empty data
