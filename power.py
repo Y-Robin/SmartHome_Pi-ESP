@@ -12,7 +12,7 @@ DEFAULT_DEVICE = {
     "name": "Socket 0",
     "url": "http://192.168.178.52/rpc/Switch.GetStatus?id=0",
 }
-POLL_INTERVAL_SECONDS = 1.0
+POLL_INTERVAL_SECONDS = 5.0
 REQUEST_TIMEOUT_SECONDS = 5
 
 
@@ -144,7 +144,7 @@ def create_power_blueprint(socketio, db):
     def _collect_device_data(app, device_config: Dict[str, str]):
         device_url = device_config.get("url") or DEFAULT_DEVICE["url"]
         device_id = device_config.get("id") or device_url
-        poll_interval = app.config.get("POWER_POLL_INTERVAL", POLL_INTERVAL_SECONDS)
+        poll_interval = max(float(app.config.get("POWER_POLL_INTERVAL", POLL_INTERVAL_SECONDS) or POLL_INTERVAL_SECONDS), 1.0)
 
         with app.app_context():
             while True:

@@ -54,6 +54,7 @@
     <section class="card" style="margin-top: 1rem;">
         <h2>Diagnose</h2>
         <p class="muted">Zeigt die letzten Server-/Datenbankfehler für Temperaturdaten.</p>
+        <p class="muted" id="temperatureDbStatus">DB-Status wird geprüft…</p>
         <pre id="temperatureErrorLog" class="muted" style="white-space: pre-wrap; margin: 0;">Keine Fehler gemeldet.</pre>
     </section>
 
@@ -253,10 +254,27 @@
             }
         }
 
+        async function refreshTemperatureDbStatus() {
+            const statusNode = document.getElementById('temperatureDbStatus');
+            try {
+                const response = await fetch('/monitoring/db_status');
+                const payload = await response.json();
+                if (payload.status === 'ok') {
+                    statusNode.textContent = 'DB-Status: OK';
+                    return;
+                }
+                statusNode.textContent = `DB-Status: ${payload.status} – ${payload.message || ''}`;
+            } catch (error) {
+                statusNode.textContent = `DB-Status konnte nicht geladen werden: ${error.message}`;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
 		updateChartForSelectedDevice(); // Load data for the default selected device on page load
                 refreshTemperatureErrorLog();
+                refreshTemperatureDbStatus();
                 setInterval(refreshTemperatureErrorLog, 10000);
+                setInterval(refreshTemperatureDbStatus, 30000);
         });
 
         // Initialize chart with empty data
