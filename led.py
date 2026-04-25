@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
+import threading
 from typing import Dict, List
 
 import requests
@@ -22,6 +23,7 @@ def _safe_load_config(config_path: Path) -> Dict:
 WEATHER_CACHE_TTL = timedelta(minutes=10)
 _weather_cache = {"timestamp": None, "data": None}
 _weather_cache_lock = Lock()
+_weather_refresh_in_progress = False
 
 def create_led_blueprint(socketio: SocketIO, db):
     led_blueprint = Blueprint('led', __name__)
@@ -235,14 +237,7 @@ def create_led_blueprint(socketio: SocketIO, db):
             return "connected" if status in {"on", "off"} else "unknown"
         return "unknown"
 
-    def fetch_weather():
-        now = datetime.utcnow()
-        with _weather_cache_lock:
-            cache_ts = _weather_cache["timestamp"]
-            cache_data = _weather_cache["data"]
-            if cache_ts and cache_data and (now - cache_ts) < WEATHER_CACHE_TTL:
-                return cache_data
-
+    def _fetch_weather_reports():
         locations = {
             "Saarburg": {"latitude": 49.6097, "longitude": 6.5438},
             "Schengen": {"latitude": 49.4683, "longitude": 6.3667},
@@ -287,7 +282,7 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "forecast_days": 1,
                         "timezone": "Europe/Berlin",
                     },
-                    timeout=1.5,
+                    timeout=2,
                 )
                 response.raise_for_status()
                 payload = response.json()
@@ -324,10 +319,74 @@ def create_led_blueprint(socketio: SocketIO, db):
                     }
                 )
 
-        with _weather_cache_lock:
-            _weather_cache["timestamp"] = datetime.utcnow()
-            _weather_cache["data"] = weather_reports
-
         return weather_reports
+
+    def _refresh_weather_cache_async():
+        global _weather_refresh_in_progress
+        try:
+            fresh_reports = _fetch_weather_reports()
+            with _weather_cache_lock:
+                _weather_cache["timestamp"] = datetime.utcnow()
+                _weather_cache["data"] = fresh_reports
+        finally:
+            with _weather_cache_lock:
+                _weather_refresh_in_progress = False
+
+    def fetch_weather():
+        global _weather_refresh_in_progress
+        now = datetime.utcnow()
+        with _weather_cache_lock:
+            cache_ts = _weather_cache["timestamp"]
+            cache_data = _weather_cache["data"]
+            cache_fresh = bool(cache_ts and cache_data and (now - cache_ts) < WEATHER_CACHE_TTL)
+
+            if cache_fresh:
+                return cache_data
+
+            should_start_refresh = not _weather_refresh_in_progress
+            if should_start_refresh:
+                _weather_refresh_in_progress = True
+
+        if should_start_refresh:
+            threading.Thread(target=_refresh_weather_cache_async, daemon=True).start()
+
+        if cache_data:
+            return cache_data
+
+        return [
+            {
+                "location": "Saarburg",
+                "temperature": None,
+                "humidity": None,
+                "weather_code": None,
+                "symbol": "—",
+                "condition": "Lade Wetterdaten…",
+                "forecast_max": None,
+                "forecast_min": None,
+                "precipitation_probability": None,
+            },
+            {
+                "location": "Schengen",
+                "temperature": None,
+                "humidity": None,
+                "weather_code": None,
+                "symbol": "—",
+                "condition": "Lade Wetterdaten…",
+                "forecast_max": None,
+                "forecast_min": None,
+                "precipitation_probability": None,
+            },
+            {
+                "location": "Saarbrücken",
+                "temperature": None,
+                "humidity": None,
+                "weather_code": None,
+                "symbol": "—",
+                "condition": "Lade Wetterdaten…",
+                "forecast_max": None,
+                "forecast_min": None,
+                "precipitation_probability": None,
+            },
+        ]
 
     return led_blueprint
