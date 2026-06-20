@@ -759,3 +759,139 @@ button:active {
         max-height: none;
     }
 }
+
+.device-admin-card {
+    margin-bottom: 20px;
+}
+
+.device-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: end;
+}
+
+.device-form input[type="text"] {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-family: inherit;
+}
+
+.device-elements-field {
+    grid-column: span 2;
+}
+
+.checkbox-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-list label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.button-danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+.button-danger:hover {
+    background: #b91c1c;
+}
+
+.button-small {
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+@media (max-width: 700px) {
+    .device-elements-field {
+        grid-column: auto;
+    }
+
+    .form-actions {
+        justify-content: stretch;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+}
+
+.device-head > div:first-child {
+    min-width: 0;
+}
+
+.device-head h3,
+.device-head .muted {
+    overflow-wrap: anywhere;
+}
+
+.device-delete-form {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 10px;
+    width: 100%;
+}
+
+.device-delete-form .button-small {
+    width: 100%;
+}
+
+.delete-mode-panel {
+    align-items: center;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 16px;
+}
+
+.delete-mode-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.delete-mode-panel .muted {
+    margin: 0;
+}
+
+.device-delete-form .button-danger,
+.delete-mode-panel .button-danger {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    border: 1px solid rgba(185, 28, 28, 0.25);
+    box-shadow: 0 8px 18px rgba(239, 68, 68, 0.18);
+}
+
+.device-delete-form .button-danger:hover,
+.delete-mode-panel .button-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    box-shadow: 0 10px 22px rgba(185, 28, 28, 0.25);
+}
+
+.delete-mode-panel {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 14px;
+}
