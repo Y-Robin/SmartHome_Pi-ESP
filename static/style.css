@@ -833,3 +833,23 @@ button:active {
         width: 100%;
     }
 }
+
+.device-head > div:first-child {
+    min-width: 0;
+}
+
+.device-head h3,
+.device-head .muted {
+    overflow-wrap: anywhere;
+}
+
+.device-delete-form {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 10px;
+    width: 100%;
+}
+
+.device-delete-form .button-small {
+    width: 100%;
+}
