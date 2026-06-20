@@ -853,3 +853,25 @@ button:active {
 .device-delete-form .button-small {
     width: 100%;
 }
+
+.delete-mode-panel {
+    align-items: center;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 16px;
+}
+
+.delete-mode-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.delete-mode-panel .muted {
+    margin: 0;
+}

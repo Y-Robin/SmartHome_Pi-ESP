@@ -8,6 +8,7 @@ import requests
 import yaml
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from flask_socketio import SocketIO
+from flask_httpauth import HTTPBasicAuth
 from requests.exceptions import ConnectionError, RequestException
 from sqlalchemy import and_, func
 
@@ -30,6 +31,14 @@ def create_led_blueprint(socketio: SocketIO, db):
 
     CONFIG_PATH = Path(__file__).resolve().with_name("config.yaml")
     config = _safe_load_config(CONFIG_PATH)
+    auth = HTTPBasicAuth()
+    users = {
+        "root": "root",
+    }
+
+    @auth.verify_password
+    def verify_password(username, password):
+        return users.get(username) == password
 
     class TemperatureData(db.Model):
         __tablename__ = "temperature_data"
@@ -110,8 +119,7 @@ def create_led_blueprint(socketio: SocketIO, db):
     socket_devices = init_devices('socket_devices')
 
 
-    @led_blueprint.route('/')
-    def index():
+    def render_home(delete_mode: bool = False):
         grouped_devices = group_devices_by_room({})
         weather = fetch_weather()
 
@@ -120,7 +128,17 @@ def create_led_blueprint(socketio: SocketIO, db):
             device_rooms=grouped_devices,
             weather=weather,
             has_devices=bool(grouped_devices),
+            delete_mode=delete_mode,
         )
+
+    @led_blueprint.route('/')
+    def index():
+        return render_home()
+
+    @led_blueprint.route('/devices/delete_mode')
+    @auth.login_required
+    def delete_mode():
+        return render_home(delete_mode=True)
 
 
     @led_blueprint.route('/devices', methods=['POST'])
@@ -154,6 +172,7 @@ def create_led_blueprint(socketio: SocketIO, db):
         return redirect(url_for('led.index'))
 
     @led_blueprint.route('/devices/<device_id>/delete', methods=['POST'])
+    @auth.login_required
     def delete_device(device_id):
         section = None
         if device_id in config.get('devices', {}):

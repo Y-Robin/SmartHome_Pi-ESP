@@ -151,9 +151,11 @@
                             {% endif %}
                         </div>
 
-                        <form class="device-delete-form" method="post" action="{{ url_for('led.delete_device', device_id=device.id) }}" onsubmit="return confirm('Gerät {{ device.id }} wirklich löschen?');">
-                            <button type="submit" class="button-danger button-small">Gerät löschen</button>
-                        </form>
+                        {% if delete_mode %}
+                            <form class="device-delete-form" method="post" action="{{ url_for('led.delete_device', device_id=device.id) }}" onsubmit="return confirm('Gerät {{ device.id }} wirklich löschen?');">
+                                <button type="submit" class="button-danger button-small">Gerät löschen</button>
+                            </form>
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
@@ -203,6 +205,15 @@
             <button type="submit">Komponente speichern</button>
         </div>
     </form>
+    <div class="delete-mode-panel">
+        {% if delete_mode %}
+            <p class="muted">Löschmodus ist aktiv. Die Lösch-Buttons werden jetzt in den Gerätekarten angezeigt.</p>
+            <a class="button-secondary delete-mode-link" href="{{ url_for('led.index') }}">Löschmodus beenden</a>
+        {% else %}
+            <p class="muted">Zum Entfernen von Geräten erst den geschützten Löschmodus aktivieren.</p>
+            <a class="button-danger delete-mode-link" href="{{ url_for('led.delete_mode') }}">Löschmodus aktivieren</a>
+        {% endif %}
+    </div>
 </section>
 {% endblock %}
 
