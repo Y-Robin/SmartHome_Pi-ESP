@@ -759,3 +759,77 @@ button:active {
         max-height: none;
     }
 }
+
+.device-admin-card {
+    margin-bottom: 20px;
+}
+
+.device-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: end;
+}
+
+.device-form input[type="text"] {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-family: inherit;
+}
+
+.device-elements-field {
+    grid-column: span 2;
+}
+
+.checkbox-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-list label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.button-danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+.button-danger:hover {
+    background: #b91c1c;
+}
+
+.button-small {
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+@media (max-width: 700px) {
+    .device-elements-field {
+        grid-column: auto;
+    }
+
+    .form-actions {
+        justify-content: stretch;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+}

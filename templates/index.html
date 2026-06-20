@@ -63,6 +63,47 @@
     {% endfor %}
 </section>
 
+<section class="card device-admin-card">
+    <div class="card-header">
+        <div>
+            <p class="eyebrow">Geräteverwaltung</p>
+            <h2>Komponente hinzufügen</h2>
+        </div>
+        <span class="pill">config.yaml</span>
+    </div>
+    <form class="device-form" method="post" action="{{ url_for('led.add_device') }}">
+        <div class="control-field">
+            <label for="device_id">Geräte-ID</label>
+            <input id="device_id" name="device_id" type="text" placeholder="ESP_04" required>
+        </div>
+        <div class="control-field">
+            <label for="device_name">Name</label>
+            <input id="device_name" name="name" type="text" placeholder="Wohnzimmer Sensor">
+        </div>
+        <div class="control-field">
+            <label for="device_ip">IP-Adresse</label>
+            <input id="device_ip" name="ip" type="text" placeholder="192.168.178.50" required>
+        </div>
+        <div class="control-field">
+            <label for="device_room">Raum</label>
+            <input id="device_room" name="room" type="text" placeholder="Wohnzimmer" value="Allgemein">
+        </div>
+        <div class="control-field device-elements-field">
+            <label>Elemente</label>
+            <div class="checkbox-list">
+                <label><input type="checkbox" name="Led"> LED</label>
+                <label><input type="checkbox" name="Temperature"> Temperatur</label>
+                <label><input type="checkbox" name="Stepper"> Stepper</label>
+                <label><input type="checkbox" name="Socket"> Steckdose</label>
+            </div>
+            <p class="muted">Steckdosen bitte einzeln anlegen, ESP-Komponenten können kombiniert werden.</p>
+        </div>
+        <div class="form-actions">
+            <button type="submit">Komponente speichern</button>
+        </div>
+    </form>
+</section>
+
 {% if has_devices %}
 <section class="rooms">
     {% for room, devices in device_rooms.items() %}
@@ -103,6 +144,9 @@
                             <div class="status-stack">
                                 <span class="status-pill status-{{ conn }}">{% if conn == 'connected' %}Connected{% elif conn == 'disconnected' %}Disconnected{% elif conn == 'error' %}Error{% else %}Unbekannt{% endif %}</span>
                                 <p class="muted status-sub">{% if device.type == 'esp' %}ESP{% else %}Steckdose{% endif %}</p>
+                                <form method="post" action="{{ url_for('led.delete_device', device_id=device.id) }}" onsubmit="return confirm('Gerät {{ device.id }} wirklich löschen?');">
+                                    <button type="submit" class="button-danger button-small">Löschen</button>
+                                </form>
                             </div>
                         </div>
 

@@ -6,7 +6,7 @@ from typing import Dict, List
 
 import requests
 import yaml
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from flask_socketio import SocketIO
 from requests.exceptions import ConnectionError, RequestException
 from sqlalchemy import and_, func
@@ -28,7 +28,7 @@ _weather_refresh_in_progress = False
 def create_led_blueprint(socketio: SocketIO, db):
     led_blueprint = Blueprint('led', __name__)
 
-    CONFIG_PATH = Path("config.yaml")
+    CONFIG_PATH = Path(__file__).resolve().with_name("config.yaml")
     config = _safe_load_config(CONFIG_PATH)
 
     class TemperatureData(db.Model):
@@ -44,13 +44,67 @@ def create_led_blueprint(socketio: SocketIO, db):
         devices = {}
         for device_id, info in config.get(section, {}).items():
             info = info or {}
-            devices[device_id] = {
-                **info,
-                "name": info.get("name", device_id),
-                "room": info.get("room", "Allgemein"),
-                "status": "unknown",
-            }
+            devices[device_id] = normalize_device(device_id, info)
         return devices
+
+    def normalize_device(device_id: str, info: Dict) -> Dict:
+        info = info or {}
+        elements = info.get("elements") or []
+        if isinstance(elements, str):
+            elements = [elements]
+
+        return {
+            **info,
+            "name": info.get("name", device_id),
+            "room": info.get("room", "Allgemein"),
+            "elements": elements,
+            "status": info.get("status", "unknown"),
+        }
+
+    def persist_config():
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w") as file:
+            yaml.safe_dump(config, file, sort_keys=False, allow_unicode=True)
+
+    def reload_device_cache(section: str, device_id: str, info: Dict):
+        target = socket_devices if section == "socket_devices" else esp_devices
+        device = normalize_device(device_id, info)
+        target[device_id] = device
+        if section == "socket_devices":
+            update_socket_status(device_id)
+        elif "Led" in device.get("elements", []):
+            try:
+                requests.get(f"http://{device['ip']}/off", timeout=2)
+                target[device_id]["status"] = "off"
+            except ConnectionError:
+                target[device_id]["status"] = "not connected"
+
+    def remove_from_device_cache(section: str, device_id: str):
+        target = socket_devices if section == "socket_devices" else esp_devices
+        target.pop(device_id, None)
+
+    def _sync_power_device_config():
+        power_devices = []
+        for device_id, props in config.get("socket_devices", {}).items():
+            ip = (props or {}).get("ip")
+            if not ip:
+                continue
+            power_devices.append({
+                "id": device_id,
+                "name": (props or {}).get("name") or device_id,
+                "url": f"http://{ip}/rpc/Switch.GetStatus?id=0",
+            })
+
+        if power_devices:
+            current_app.config["POWER_DEVICES"] = power_devices
+        else:
+            current_app.config.pop("POWER_DEVICES", None)
+
+    def selected_elements_from_form():
+        return [element for element in ["Led", "Temperature", "Stepper", "Socket"] if request.form.get(element)]
+
+    def section_for_elements(elements: List[str]) -> str:
+        return "socket_devices" if "Socket" in elements else "devices"
 
     esp_devices = init_devices('devices')
     socket_devices = init_devices('socket_devices')
@@ -67,6 +121,55 @@ def create_led_blueprint(socketio: SocketIO, db):
             weather=weather,
             has_devices=bool(grouped_devices),
         )
+
+
+    @led_blueprint.route('/devices', methods=['POST'])
+    def add_device():
+        device_id = (request.form.get('device_id') or '').strip()
+        ip = (request.form.get('ip') or '').strip()
+        name = (request.form.get('name') or '').strip()
+        room = (request.form.get('room') or '').strip() or 'Allgemein'
+        elements = selected_elements_from_form()
+
+        if not device_id or not ip or not elements:
+            return jsonify({"error": "device_id, ip und mindestens ein Element sind erforderlich"}), 400
+        if "Socket" in elements and len(elements) > 1:
+            return jsonify({"error": "Socket-Geräte dürfen nicht mit ESP-Elementen kombiniert werden"}), 400
+        if device_id in config.get('devices', {}) or device_id in config.get('socket_devices', {}):
+            return jsonify({"error": "Diese Geräte-ID existiert bereits"}), 409
+
+        section = section_for_elements(elements)
+        config.setdefault(section, {})[device_id] = {
+            "ip": ip,
+            "room": room,
+            "elements": elements,
+        }
+        if name:
+            config[section][device_id]["name"] = name
+
+        persist_config()
+        reload_device_cache(section, device_id, config[section][device_id])
+        if section == "socket_devices":
+            _sync_power_device_config()
+        return redirect(url_for('led.index'))
+
+    @led_blueprint.route('/devices/<device_id>/delete', methods=['POST'])
+    def delete_device(device_id):
+        section = None
+        if device_id in config.get('devices', {}):
+            section = 'devices'
+        elif device_id in config.get('socket_devices', {}):
+            section = 'socket_devices'
+
+        if not section:
+            return jsonify({"error": "Unbekanntes Gerät"}), 404
+
+        config.get(section, {}).pop(device_id, None)
+        persist_config()
+        remove_from_device_cache(section, device_id)
+        if section == "socket_devices":
+            _sync_power_device_config()
+        return redirect(url_for('led.index'))
 
     @led_blueprint.route('/api/latest_readings')
     def latest_readings_api():
