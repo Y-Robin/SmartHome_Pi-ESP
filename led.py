@@ -157,13 +157,17 @@ def create_led_blueprint(socketio: SocketIO, db):
             return jsonify({"error": "Diese Geräte-ID existiert bereits"}), 409
 
         section = section_for_elements(elements)
-        config.setdefault(section, {})[device_id] = {
+        device_config = {
             "ip": ip,
             "room": room,
             "elements": elements,
         }
         if name:
-            config[section][device_id]["name"] = name
+            device_config["name"] = name
+
+        config.setdefault(section, {})[device_id] = device_config
+        if "Stepper" in elements:
+            config.setdefault("stepper_devices", {})[device_id] = dict(device_config)
 
         persist_config()
         reload_device_cache(section, device_id, config[section][device_id])
@@ -184,6 +188,7 @@ def create_led_blueprint(socketio: SocketIO, db):
             return jsonify({"error": "Unbekanntes Gerät"}), 404
 
         config.get(section, {}).pop(device_id, None)
+        config.get("stepper_devices", {}).pop(device_id, None)
         persist_config()
         remove_from_device_cache(section, device_id)
         if section == "socket_devices":

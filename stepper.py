@@ -4,17 +4,16 @@ import yaml
 from pathlib import Path
 from flask_httpauth import HTTPBasicAuth
 
+CONFIG_PATH = Path(__file__).resolve().with_name("config.yaml")
+
 def load_config():
-    with open(Path("config.yaml"), 'r') as file:
-        return yaml.safe_load(file)
+    if not CONFIG_PATH.exists():
+        return {}
+
+    with open(CONFIG_PATH, 'r') as file:
+        return yaml.safe_load(file) or {}
 
 def create_stepper_blueprint():
-    config = load_config()
-    stepper_devices = config.get("stepper_devices", {})
-
-    if not stepper_devices:
-        raise ValueError("Keine Stepper-Geräte in config.yaml gefunden.")
-
     auth = HTTPBasicAuth()
     users = {
         "root": "root",  # Passwort anpassen
@@ -30,6 +29,9 @@ def create_stepper_blueprint():
     @stepper_blueprint.route('/stepper')
     @auth.login_required
     def default_stepper():
+        stepper_devices = load_config().get("stepper_devices", {})
+        if not stepper_devices:
+            return "Keine Stepper-Geräte in config.yaml gefunden.", 404
         first_stepper = next(iter(stepper_devices))
         return redirect(url_for('stepper.stepper_control', device_id=first_stepper))
 
@@ -37,6 +39,7 @@ def create_stepper_blueprint():
     @stepper_blueprint.route('/stepper/<device_id>')
     @auth.login_required
     def stepper_control(device_id):
+        stepper_devices = load_config().get("stepper_devices", {})
         if device_id not in stepper_devices:
             return f"Unbekanntes Stepper-Device '{device_id}'", 404
         return render_template('stepper.html', device_id=device_id, devices=stepper_devices)

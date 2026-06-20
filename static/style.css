@@ -875,3 +875,23 @@ button:active {
 .delete-mode-panel .muted {
     margin: 0;
 }
+
+.device-delete-form .button-danger,
+.delete-mode-panel .button-danger {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    border: 1px solid rgba(185, 28, 28, 0.25);
+    box-shadow: 0 8px 18px rgba(239, 68, 68, 0.18);
+}
+
+.device-delete-form .button-danger:hover,
+.delete-mode-panel .button-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    box-shadow: 0 10px 22px rgba(185, 28, 28, 0.25);
+}
+
+.delete-mode-panel {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    padding: 14px;
+}
