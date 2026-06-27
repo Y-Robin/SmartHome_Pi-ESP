@@ -23,6 +23,9 @@
                         <span class="weather-symbol" aria-hidden="true">{{ report.symbol }}</span>
                         <span class="weather-condition">{{ report.condition }}</span>
                     </div>
+                    {% if report.source or report.updated_at %}
+                        <p class="muted">{{ report.source or 'Wetterdienst' }}{% if report.updated_at %} · Stand {{ report.updated_at }}{% endif %}</p>
+                    {% endif %}
                 </div>
             </div>
             {% if report.temperature is not none %}
@@ -47,15 +50,15 @@
             <div class="forecast">
                 <div>
                     <p class="label">Max</p>
-                    <p class="value">{{ report.forecast_max | default('—') }}°C</p>
+                    <p class="value">{% if report.forecast_max is not none %}{{ report.forecast_max | round(1) }}°C{% else %}—{% endif %}</p>
                 </div>
                 <div>
                     <p class="label">Min</p>
-                    <p class="value">{{ report.forecast_min | default('—') }}°C</p>
+                    <p class="value">{% if report.forecast_min is not none %}{{ report.forecast_min | round(1) }}°C{% else %}—{% endif %}</p>
                 </div>
                 <div>
                     <p class="label">Regen</p>
-                    <p class="value">{{ report.precipitation_probability | default('—') }}%</p>
+                    <p class="value">{% if report.precipitation_probability is not none %}{{ report.precipitation_probability }}%{% else %}—{% endif %}</p>
                 </div>
             </div>
         {% endif %}
