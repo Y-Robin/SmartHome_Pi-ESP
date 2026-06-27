@@ -21,7 +21,8 @@ def _safe_load_config(config_path: Path) -> Dict:
         return yaml.safe_load(file) or {}
 
 
-WEATHER_CACHE_TTL = timedelta(minutes=10)
+WEATHER_CACHE_TTL = timedelta(minutes=5)
+WEATHER_API_TIMEOUT_SECONDS = 4
 _weather_cache = {"timestamp": None, "data": None}
 _weather_cache_lock = Lock()
 _weather_refresh_in_progress = False
@@ -378,9 +379,9 @@ def create_led_blueprint(socketio: SocketIO, db):
 
     def _fetch_weather_reports():
         locations = {
-            "Saarburg": {"latitude": 49.6097, "longitude": 6.5438},
-            "Schengen": {"latitude": 49.4683, "longitude": 6.3667},
-            "Saarbrücken": {"latitude": 49.2402, "longitude": 6.9969},
+            "Saarburg": {"latitude": 49.6097, "longitude": 6.5438, "country": "DE"},
+            "Schengen": {"latitude": 49.4683, "longitude": 6.3667, "country": "LU"},
+            "Saarbrücken": {"latitude": 49.2344, "longitude": 6.9969, "country": "DE"},
         }
 
         def weather_summary(code):
@@ -408,23 +409,37 @@ def create_led_blueprint(socketio: SocketIO, db):
                 return {"symbol": "⛈️", "label": "Gewitter"}
             return {"symbol": "—", "label": "Unbekannt"}
 
+        def fetch_location_weather(coords):
+            params = {
+                "latitude": coords["latitude"],
+                "longitude": coords["longitude"],
+                "current": "temperature_2m,relative_humidity_2m,weather_code",
+                "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code",
+                "forecast_days": 1,
+                "timezone": "Europe/Berlin",
+                "cell_selection": "nearest",
+            }
+            endpoints = []
+            if coords.get("country") == "DE":
+                endpoints.append(("https://api.open-meteo.com/v1/dwd-icon", "DWD ICON"))
+            endpoints.append(("https://api.open-meteo.com/v1/forecast", "Open-Meteo"))
+
+            last_error = None
+            for endpoint, source in endpoints:
+                try:
+                    response = requests.get(endpoint, params=params, timeout=WEATHER_API_TIMEOUT_SECONDS)
+                    response.raise_for_status()
+                    payload = response.json()
+                    payload["source"] = source
+                    return payload
+                except (RequestException, ValueError) as error:
+                    last_error = error
+            raise last_error or RequestException("Wetterdaten konnten nicht geladen werden")
+
         weather_reports = []
         for name, coords in locations.items():
             try:
-                response = requests.get(
-                    "https://api.open-meteo.com/v1/forecast",
-                    params={
-                        "latitude": coords["latitude"],
-                        "longitude": coords["longitude"],
-                        "current": "temperature_2m,relative_humidity_2m,weather_code",
-                        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code",
-                        "forecast_days": 1,
-                        "timezone": "Europe/Berlin",
-                    },
-                    timeout=2,
-                )
-                response.raise_for_status()
-                payload = response.json()
+                payload = fetch_location_weather(coords)
                 current = payload.get("current", {})
                 daily = payload.get("daily", {})
 
@@ -440,6 +455,8 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "forecast_max": (daily.get("temperature_2m_max") or [None])[0],
                         "forecast_min": (daily.get("temperature_2m_min") or [None])[0],
                         "precipitation_probability": (daily.get("precipitation_probability_max") or [None])[0],
+                        "source": payload.get("source"),
+                        "updated_at": current.get("time"),
                     }
                 )
             except (RequestException, ValueError, KeyError):
@@ -454,6 +471,8 @@ def create_led_blueprint(socketio: SocketIO, db):
                         "forecast_max": None,
                         "forecast_min": None,
                         "precipitation_probability": None,
+                        "source": None,
+                        "updated_at": None,
                         "error": "Wetterdaten konnten nicht geladen werden",
                     }
                 )
@@ -503,6 +522,8 @@ def create_led_blueprint(socketio: SocketIO, db):
                 "forecast_max": None,
                 "forecast_min": None,
                 "precipitation_probability": None,
+                "source": None,
+                "updated_at": None,
             },
             {
                 "location": "Schengen",
@@ -514,6 +535,8 @@ def create_led_blueprint(socketio: SocketIO, db):
                 "forecast_max": None,
                 "forecast_min": None,
                 "precipitation_probability": None,
+                "source": None,
+                "updated_at": None,
             },
             {
                 "location": "Saarbrücken",
@@ -525,6 +548,8 @@ def create_led_blueprint(socketio: SocketIO, db):
                 "forecast_max": None,
                 "forecast_min": None,
                 "precipitation_probability": None,
+                "source": None,
+                "updated_at": None,
             },
         ]
 
